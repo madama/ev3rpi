@@ -20,12 +20,11 @@ import javax.sound.sampled.TargetDataLine;
 
 public class AudioUtils {
 
-	public AudioInputStream recordAudio() {
-		System.out.println("Start audio recording...");
+	public AudioInputStream recordAudio(long time) {
 		AudioRecorder rec = new AudioRecorder(getAudioFormat());
 		rec.start();
 		try {
-			Thread.sleep(5000);
+			Thread.sleep(time);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -37,8 +36,13 @@ public class AudioUtils {
 				e.printStackTrace();
 			}
 		}
-		System.out.println("Audio recorded!");
 		return rec.getAudioInputStream();
+	}
+
+	public AudioRecorder startRecording() {
+		AudioRecorder rec = new AudioRecorder(getAudioFormat());
+		rec.start();
+		return rec;
 	}
 
 	public void playAudio(AudioInputStream audio) {
@@ -103,7 +107,7 @@ public class AudioUtils {
 		return format;
 	}
 
-	private class AudioRecorder implements Runnable {
+	public class AudioRecorder implements Runnable {
 		// record microphone && generate stream/byte array
 		private AudioInputStream audioInputStream;
 		private AudioFormat format;
@@ -161,10 +165,8 @@ public class AudioUtils {
 			audioInputStream = new AudioInputStream(bais, format, audioBytes.length / frameSizeInBytes);
 			final long milliseconds = (long) ((audioInputStream.getFrameLength() * 1000) / format.getFrameRate());
 			duration = milliseconds / 1000.0;
-			System.out.println("Audio time: " + duration);
 			try {
 				audioInputStream.reset();
-				System.out.println("resetting...");
 			} catch (final Exception ex) {
 				ex.printStackTrace();
 				return;
