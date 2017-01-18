@@ -6,6 +6,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.util.Properties;
 
 import javax.sound.sampled.AudioInputStream;
@@ -22,6 +23,8 @@ import org.danysoft.ev3rpi.AudioUtils.AudioRecorder;
 
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.lexrts.AmazonLexRuntimeClient;
+import com.amazonaws.services.polly.AmazonPollyClient;
+import com.amazonaws.services.polly.model.VoiceId;
 
 public class RobotUI extends JFrame {
 
@@ -55,6 +58,7 @@ public class RobotUI extends JFrame {
 	private AudioInputStream audioIS;
 
 	private LexWrapper lex;
+	private PollyWrapper polly;
 
 	public RobotUI() {
 		init();
@@ -73,7 +77,9 @@ public class RobotUI extends JFrame {
 		String accessKey = properties.getProperty("AWS_ACCESS_KEY");
 		String secretKey = properties.getProperty("AWS_SECRET_KEY");
 		BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-		lex = new LexWrapper(new AmazonLexRuntimeClient(awsCredentials), "LegoRPI", "EveRPI");
+		com.amazonaws.android.auth.BasicAWSCredentials lexCredentials = new com.amazonaws.android.auth.BasicAWSCredentials(accessKey, secretKey);
+		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI");
+		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials), VoiceId.Brian);
 	}
 
 	private void draw() {
@@ -157,6 +163,7 @@ public class RobotUI extends JFrame {
 	private void appendCommandLog(String message) {
 		commandLog.append(message);
 		commandLog.append("\n");
+		appendLog(message);
 	}
 
 	private void appendLog(String message) {
@@ -180,11 +187,17 @@ public class RobotUI extends JFrame {
 						appendLog("ERROR: " + err.getMessage());
 					}
 				}
+				((JButton)e.getSource()).setText("REC");
 				audioIS = recorder.getAudioInputStream();
 				appendLog("Audio Recording Complete! " + recorder.getDuration());
 				recorder = null;
+				appendLog("Send audio to Lex");
 				String lexOutput = lex.sendAudio(audioIS);
 				appendCommandLog(lexOutput);
+				appendLog("Send text to Polly");
+				InputStream tts = polly.tts(lexOutput);
+				audioUtils.saveAudio("fromPolly.wav", tts);
+				audioUtils.playAudio("fromPolly.wav");
 			}
 		}
 	}

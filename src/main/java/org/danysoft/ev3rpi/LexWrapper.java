@@ -2,17 +2,17 @@ package org.danysoft.ev3rpi;
 
 import java.io.InputStream;
 
-import com.amazonaws.services.lexrts.AmazonLexRuntimeClient;
+import com.amazonaws.services.lexrts.AmazonLexRuntime;
 import com.amazonaws.services.lexrts.model.PostContentRequest;
 import com.amazonaws.services.lexrts.model.PostContentResult;
 
 public class LexWrapper {
 
-	private AmazonLexRuntimeClient lex;
+	private AmazonLexRuntime lex;
 	private String botName;
 	private String botAlias;
 
-	public LexWrapper(AmazonLexRuntimeClient lex, String botName, String botAlias) {
+	public LexWrapper(AmazonLexRuntime lex, String botName, String botAlias) {
 		this.lex = lex;
 		this.botName = botName;
 		this.botAlias = botAlias;
@@ -27,7 +27,7 @@ public class LexWrapper {
 		req.setUserId("ev3rpi");
 		req.setAccept("text/plain; charset=utf-8");
 		PostContentResult res = lex.postContent(req);
-		System.out.println(res);
+		System.out.println("Lex response: " + res);
 		return res.getMessage();
 	}
 

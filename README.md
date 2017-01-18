@@ -7,7 +7,9 @@
 sudo apt-get update  
 sudo apt-get upgrade  
 sudo raspi-config (enable SSH access)  
-sudo apt-get install oracle-java8-jdk libopencv2.4-java fswebcam pi-bluetooth  
+sudo apt-get install oracle-java8-jdk libopencv2.4-java   
+
+<!-- sudo apt-get install vim fswebcam pavucontrol audacity -->
 
 ### EV3Dev
 sudo apt-get update  

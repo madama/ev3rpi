@@ -17,7 +17,6 @@ import javax.sound.sampled.Mixer;
 import javax.sound.sampled.SourceDataLine;
 import javax.sound.sampled.TargetDataLine;
 
-
 public class AudioUtils {
 
 	public AudioInputStream recordAudio(long time) {
@@ -45,6 +44,14 @@ public class AudioUtils {
 		return rec;
 	}
 
+	public void playAudio(String fileName) {
+		try {
+			Runtime.getRuntime().exec("aplay -t raw -c 1 -r 16000 -f S16_LE " + fileName);
+		} catch (Exception e) {
+			e.printStackTrace(System.err);
+		}
+	}
+
 	public void playAudio(AudioInputStream audio) {
 		try {
 			System.out.println("Start audio playing...");
@@ -57,7 +64,7 @@ public class AudioUtils {
 			player.close();
 			System.out.println("Audio played!");
 		} catch (Exception e) {
-			System.err.println("Cannot play audio file!");
+			System.err.println("Cannot play audio file! " + e.getMessage());
 		}
 	}
 
@@ -91,13 +98,15 @@ public class AudioUtils {
 		try {
 			File targetFile = new File(file);
 			java.nio.file.Files.copy(audio, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-			audio.reset();
+			if (audio.markSupported()) {
+				audio.reset();
+			}
 		} catch (Exception e) {
 			e.printStackTrace(System.err);
 		}
 	}
 
-	private AudioFormat getAudioFormat() {
+	public AudioFormat getAudioFormat() {
 		float sampleRate = 16000;
 		int sampleSizeInBits = 16;
 		int channels = 1;
