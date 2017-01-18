@@ -80,6 +80,7 @@ public class RobotUI extends JFrame {
 		com.amazonaws.android.auth.BasicAWSCredentials lexCredentials = new com.amazonaws.android.auth.BasicAWSCredentials(accessKey, secretKey);
 		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI");
 		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials), VoiceId.Brian);
+		audioUtils.printMixerInfo();
 	}
 
 	private void draw() {
@@ -191,6 +192,7 @@ public class RobotUI extends JFrame {
 				audioIS = recorder.getAudioInputStream();
 				appendLog("Audio Recording Complete! " + recorder.getDuration());
 				recorder = null;
+				audioUtils.saveAudio("fromMic.wav", audioIS);
 				appendLog("Send audio to Lex");
 				String lexOutput = lex.sendAudio(audioIS);
 				appendCommandLog(lexOutput);
