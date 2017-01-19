@@ -44,6 +44,12 @@ public class AudioUtils {
 		return rec;
 	}
 
+	public AudioRecorder startRecording(Mixer mixer) {
+		AudioRecorder rec = new AudioRecorder(mixer, getAudioFormat());
+		rec.start();
+		return rec;
+	}
+
 	public void playAudio(String fileName) {
 		try {
 			Runtime.getRuntime().exec("aplay -t raw -c 1 -r 16000 -f S16_LE " + fileName);
@@ -130,6 +136,12 @@ public class AudioUtils {
 			this.format = format;
 		}
 
+		public AudioRecorder(Mixer mixer, AudioFormat format) {
+			super();
+			this.format = format;
+			this.line = getTargetDataLineForRecord(mixer);
+		}
+
 		public void start() {
 			thread = new Thread(this);
 			thread.setName("Capture");
@@ -143,7 +155,10 @@ public class AudioUtils {
 
 		public void run() {
 			duration = 0;
-			line = getTargetDataLineForRecord();
+			if (line == null) {
+				line = getTargetDataLineForRecord();
+			}
+			System.out.println("Using line for recording: " + line.getLineInfo());
 			final ByteArrayOutputStream out = new ByteArrayOutputStream();
 			final int frameSizeInBytes = format.getFrameSize();
 			final int bufferLengthInFrames = line.getBufferSize() / 8;
@@ -195,6 +210,30 @@ public class AudioUtils {
 				line.open(format, line.getBufferSize());
 			} catch (final Exception ex) {
 				return null;
+			}
+			Line.Info[] infos = AudioSystem.getTargetLineInfo(info);
+			for (Line.Info i : infos){
+				System.out.println("USING LINE: " + i.toString());
+			}
+			return line;
+		}
+
+		private TargetDataLine getTargetDataLineForRecord(Mixer mixer) {
+			TargetDataLine line;
+			final DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+			if (!AudioSystem.isLineSupported(info)) {
+				return null;
+			}
+			// get and open the target data line for capture.
+			try {
+				line = (TargetDataLine) mixer.getLine(info);
+				line.open(format, line.getBufferSize());
+			} catch (final Exception ex) {
+				return null;
+			}
+			Line.Info[] infos = AudioSystem.getTargetLineInfo(info);
+			for (Line.Info i : infos){
+				System.out.println("USING LINE: " + i.toString());
 			}
 			return line;
 		}

@@ -2,6 +2,7 @@ package org.danysoft.ev3rpi;
 
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -10,9 +11,15 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Line;
+import javax.sound.sampled.Mixer;
+import javax.sound.sampled.TargetDataLine;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
@@ -56,6 +63,7 @@ public class RobotUI extends JFrame {
 
 	private AudioRecorder recorder;
 	private AudioInputStream audioIS;
+	private Mixer mixer;
 
 	private LexWrapper lex;
 	private PollyWrapper polly;
@@ -80,7 +88,6 @@ public class RobotUI extends JFrame {
 		com.amazonaws.android.auth.BasicAWSCredentials lexCredentials = new com.amazonaws.android.auth.BasicAWSCredentials(accessKey, secretKey);
 		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI");
 		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials), VoiceId.Brian);
-		audioUtils.printMixerInfo();
 	}
 
 	private void draw() {
@@ -105,6 +112,23 @@ public class RobotUI extends JFrame {
 		rec.setMnemonic(KeyEvent.VK_R);
 		rec.addActionListener(new RecActionListener());
 		panel.add(rec);
+
+		JPanel buttonPanel = new JPanel(new GridLayout(0, 1));
+		ButtonGroup group = new ButtonGroup();
+		Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
+		for (Mixer.Info info : mixerInfos) {
+			Mixer m = AudioSystem.getMixer(info);
+			Line.Info[] lineInfos = m.getTargetLineInfo();
+			if (lineInfos.length > 0 && lineInfos[0].getLineClass().equals(TargetDataLine.class)) {
+				JRadioButton button = new JRadioButton();
+				button.setText(info.getName());
+				button.setActionCommand(info.toString());
+				button.addActionListener(setInput);
+				buttonPanel.add(button);
+				group.add(button);
+			}
+		}
+		panel.add(buttonPanel);
 
 		tabbedPane = new JTabbedPane();
 		tabPanel1 = new JPanel();
@@ -172,13 +196,27 @@ public class RobotUI extends JFrame {
 		log.append("\n");
 	}
 
+	private ActionListener setInput = new ActionListener() {
+		@Override
+		public void actionPerformed(ActionEvent arg0) {
+			for (Mixer.Info info : AudioSystem.getMixerInfo()) {
+				if (arg0.getActionCommand().equals(info.toString())) {
+					Mixer newValue = AudioSystem.getMixer(info);
+					//MicrophonePanel.this.firePropertyChange("mixer", mixer, newValue);
+					mixer = newValue;
+					break;
+				}
+			}
+		}
+	};
+
 	private class RecActionListener implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			if (recorder == null) {
 				((JButton)e.getSource()).setText("RECORDING...");
 				appendLog("Start Audio Recording...");
-				recorder = audioUtils.startRecording();
+				recorder = audioUtils.startRecording(mixer);
 			} else {
 				recorder.stop();
 				while (!recorder.isDone()) {
