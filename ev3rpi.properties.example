@@ -1,3 +1,4 @@
 webcam.skipframes=3
 AWS_ACCESS_KEY=
 AWS_SECRET_KEY=
+ev3dev.address=

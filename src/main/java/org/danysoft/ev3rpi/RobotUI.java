@@ -60,6 +60,7 @@ public class RobotUI extends JFrame {
 	private OpenCVUtils cvUtils;
 	private CamUtils camUtils;
 	private AudioUtils audioUtils;
+	private EV3DevUtils ev3DevUtils;
 
 	private AudioRecorder recorder;
 	private AudioInputStream audioIS;
@@ -81,6 +82,10 @@ public class RobotUI extends JFrame {
 			properties.load(new FileInputStream("ev3rpi.properties"));
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+		if (properties.containsKey("ev3dev.address")) {
+			String ip = properties.getProperty("ev3dev.address");
+			ev3DevUtils = new EV3DevUtils(ip);
 		}
 		String accessKey = properties.getProperty("AWS_ACCESS_KEY");
 		String secretKey = properties.getProperty("AWS_SECRET_KEY");
@@ -234,10 +239,17 @@ public class RobotUI extends JFrame {
 				appendLog("Send audio to Lex");
 				String lexOutput = lex.sendAudio(audioIS);
 				appendCommandLog(lexOutput);
-				appendLog("Send text to Polly");
-				InputStream tts = polly.tts(lexOutput);
-				audioUtils.saveAudio("fromPolly.wav", tts);
-				audioUtils.playAudio("fromPolly.wav");
+				if (lexOutput.startsWith("COMMAND: rekognition")) {
+					
+				} else if (lexOutput.startsWith("COMMAND: ev3dev")) {
+					String command = lexOutput.substring(15).trim();
+					ev3DevUtils.execCommand(command);
+				} else {
+					appendLog("Send text to Polly");
+					InputStream tts = polly.tts(lexOutput);
+					audioUtils.saveAudio("fromPolly.wav", tts);
+					audioUtils.playAudio("fromPolly.wav");
+				}
 			}
 		}
 	}
