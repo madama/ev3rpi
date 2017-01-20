@@ -7,7 +7,12 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.Properties;
 
 import javax.sound.sampled.AudioInputStream;
@@ -32,6 +37,11 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.lexrts.AmazonLexRuntimeClient;
 import com.amazonaws.services.polly.AmazonPollyClient;
 import com.amazonaws.services.polly.model.VoiceId;
+import com.amazonaws.services.rekognition.AmazonRekognitionClient;
+import com.amazonaws.services.rekognition.model.Emotion;
+import com.amazonaws.services.rekognition.model.FaceDetail;
+import com.amazonaws.services.rekognition.model.Image;
+import com.amazonaws.services.rekognition.model.Label;
 
 public class RobotUI extends JFrame {
 
@@ -68,6 +78,7 @@ public class RobotUI extends JFrame {
 
 	private LexWrapper lex;
 	private PollyWrapper polly;
+	private RekognitionWrapper rekognition;
 
 	public RobotUI() {
 		init();
@@ -93,6 +104,7 @@ public class RobotUI extends JFrame {
 		com.amazonaws.android.auth.BasicAWSCredentials lexCredentials = new com.amazonaws.android.auth.BasicAWSCredentials(accessKey, secretKey);
 		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI");
 		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials), VoiceId.Brian);
+		rekognition = new RekognitionWrapper(new AmazonRekognitionClient(awsCredentials));
 	}
 
 	private void draw() {
@@ -207,7 +219,6 @@ public class RobotUI extends JFrame {
 			for (Mixer.Info info : AudioSystem.getMixerInfo()) {
 				if (arg0.getActionCommand().equals(info.toString())) {
 					Mixer newValue = AudioSystem.getMixer(info);
-					//MicrophonePanel.this.firePropertyChange("mixer", mixer, newValue);
 					mixer = newValue;
 					break;
 				}
@@ -217,9 +228,9 @@ public class RobotUI extends JFrame {
 
 	private class RecActionListener implements ActionListener {
 		@Override
-		public void actionPerformed(ActionEvent e) {
+		public void actionPerformed(ActionEvent event) {
 			if (recorder == null) {
-				((JButton)e.getSource()).setText("RECORDING...");
+				((JButton)event.getSource()).setText("RECORDING...");
 				appendLog("Start Audio Recording...");
 				recorder = audioUtils.startRecording(mixer);
 			} else {
@@ -231,7 +242,7 @@ public class RobotUI extends JFrame {
 						appendLog("ERROR: " + err.getMessage());
 					}
 				}
-				((JButton)e.getSource()).setText("REC");
+				((JButton)event.getSource()).setText("REC");
 				audioIS = recorder.getAudioInputStream();
 				appendLog("Audio Recording Complete! " + recorder.getDuration());
 				recorder = null;
@@ -240,18 +251,86 @@ public class RobotUI extends JFrame {
 				String lexOutput = lex.sendAudio(audioIS);
 				appendCommandLog(lexOutput);
 				if (lexOutput.startsWith("COMMAND: rekognition")) {
-					
+					int threshold = 50;
+					String command = lexOutput.substring(20).trim();
+					if (command.equals("labels")) {
+						camUtils.capture("capture.png");
+						Image image = new Image();
+						try {
+							image.setBytes(ByteBuffer.wrap(Files.readAllBytes(Paths.get("capture.png"))));
+						} catch (IOException e1) {
+							e1.printStackTrace(System.err);
+						}
+						List<Label> labels = rekognition.detectLabels(image);
+						StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
+						for (Label l : labels) {
+							if (l.getConfidence().intValue() > threshold) {
+								labelsText.append(l.getName()).append(", ");
+							}
+						}
+						talk(labelsText.toString());
+					} else if (command.equals("face")) {
+						camUtils.capture("capture.png");
+						Image image = new Image();
+						try {
+							image.setBytes(ByteBuffer.wrap(Files.readAllBytes(Paths.get("capture.png"))));
+						} catch (IOException e1) {
+							e1.printStackTrace(System.err);
+						}
+						List<FaceDetail> faces = rekognition.detectFaces(image);
+						StringBuffer facesText = new StringBuffer("In this face I can recognize: ");
+						for (FaceDetail f : faces) {
+							facesText.append("face! ");
+							if (f.getBeard().getConfidence().intValue() > threshold && f.getBeard().isValue()) {
+								facesText.append("beard, ");
+							}
+							List<Emotion> emotions = f.getEmotions();
+							for (Emotion e : emotions) {
+								if (e.getConfidence().intValue() > threshold) {
+									facesText.append(e.getType()).append(", ");
+								}
+							}
+							if (f.getEyeglasses().getConfidence().intValue() > threshold && f.getEyeglasses().isValue()) {
+								facesText.append("eyeglasses, ");
+							}
+							if (f.getEyesOpen().getConfidence().intValue() > threshold && f.getEyesOpen().isValue()) {
+								facesText.append("eyes open, ");
+							}
+							if (f.getGender().getConfidence().intValue() > threshold) {
+								facesText.append(f.getGender().getValue()).append(", ");
+							}
+							if (f.getMouthOpen().getConfidence().intValue() > threshold && f.getMouthOpen().isValue()) {
+								facesText.append("mouth open, ");
+							}
+							if (f.getMustache().getConfidence().intValue() > threshold && f.getMustache().isValue()) {
+								facesText.append("mustache, ");
+							}
+							if (f.getSmile().getConfidence().intValue() > threshold && f.getSmile().isValue()) {
+								facesText.append("smile, ");
+							}
+							if (f.getSunglasses().getConfidence().intValue() > threshold && f.getSunglasses().isValue()) {
+								facesText.append("sunglasses, ");
+							}
+						}
+						talk(facesText.toString());
+					} else if (command.equals("SearchFacesByImage")) {
+						
+					}
 				} else if (lexOutput.startsWith("COMMAND: ev3dev")) {
 					String command = lexOutput.substring(15).trim();
 					ev3DevUtils.execCommand(command);
 				} else {
-					appendLog("Send text to Polly");
-					InputStream tts = polly.tts(lexOutput);
-					audioUtils.saveAudio("fromPolly.wav", tts);
-					audioUtils.playAudio("fromPolly.wav");
+					talk(lexOutput);
 				}
 			}
 		}
+	}
+
+	private void talk(String text) {
+		appendLog("Send text to Polly: " + text);
+		InputStream tts = polly.tts(text);
+		audioUtils.saveAudio("fromPolly.wav", tts);
+		audioUtils.playAudio("fromPolly.wav");
 	}
 
 }

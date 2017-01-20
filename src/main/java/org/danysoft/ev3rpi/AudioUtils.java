@@ -158,7 +158,7 @@ public class AudioUtils {
 			if (line == null) {
 				line = getTargetDataLineForRecord();
 			}
-			System.out.println("Using line for recording: " + line.getLineInfo());
+			//System.out.println("Using line for recording: " + line.getLineInfo());
 			final ByteArrayOutputStream out = new ByteArrayOutputStream();
 			final int frameSizeInBytes = format.getFrameSize();
 			final int bufferLengthInFrames = line.getBufferSize() / 8;
@@ -211,10 +211,10 @@ public class AudioUtils {
 			} catch (final Exception ex) {
 				return null;
 			}
-			Line.Info[] infos = AudioSystem.getTargetLineInfo(info);
-			for (Line.Info i : infos){
-				System.out.println("USING LINE: " + i.toString());
-			}
+			//Line.Info[] infos = AudioSystem.getTargetLineInfo(info);
+			//for (Line.Info i : infos){
+			//	System.out.println("USING LINE: " + i.toString());
+			//}
 			return line;
 		}
 
@@ -231,10 +231,10 @@ public class AudioUtils {
 			} catch (final Exception ex) {
 				return null;
 			}
-			Line.Info[] infos = AudioSystem.getTargetLineInfo(info);
-			for (Line.Info i : infos){
-				System.out.println("USING LINE: " + i.toString());
-			}
+			//Line.Info[] infos = AudioSystem.getTargetLineInfo(info);
+			//for (Line.Info i : infos){
+			//	System.out.println("USING LINE: " + i.toString());
+			//}
 			return line;
 		}
 

@@ -22,12 +22,14 @@ public class CamUtils {
 
 	public boolean capture(String file) {
 		Mat frame = new Mat();
+		cam.open(0);
 		if (skipFrames != 0) {
 			for (int i=0; i<skipFrames; i++) {
 				cam.grab();
 			}
 		}
 		cam.read(frame);
+		cam.release();
 		return Highgui.imwrite(file, frame);
 	}
 
