@@ -1,5 +1,5 @@
 # What?
-
+![EV3RPI Robot](src/main/resources/splashscreen.png)
 
 ## Install
 
