@@ -10,12 +10,12 @@ public class SSHUtils {
 
 	private SSHClient ssh;
 
-	public SSHUtils(String ip) {
-		ssh = connect(ip);
+	public SSHUtils(String ip, String user, String password) {
+		ssh = connect(ip, user, password);
 	}
 
 	@SuppressWarnings("resource")
-	private static SSHClient connect(String ip) {
+	private static SSHClient connect(String ip, String user, String password) {
 		final SSHClient ssh = new SSHClient();
 		ssh.addHostKeyVerifier(new PromiscuousVerifier());
 		while (!ssh.isConnected()) {
@@ -32,7 +32,7 @@ public class SSHUtils {
 		}
 		while (!ssh.isAuthenticated()) {
 			try {
-				ssh.authPassword("robot", "maker");
+				ssh.authPassword(user, password);
 			} catch (Exception e) {
 				if (!ssh.isConnected()) {
 					throw new IllegalStateException("SSH Connection dropped!");

@@ -1,0 +1,2 @@
+echo -ne "ml.run_timed(time_sp=2000, speed_sp=-ml.max_speed)
+mr.run_timed(time_sp=2000, speed_sp=-ml.max_speed)" >> ev3rpi.in

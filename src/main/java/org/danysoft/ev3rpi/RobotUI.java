@@ -99,7 +99,9 @@ public class RobotUI extends JFrame {
 		}
 		if (properties.containsKey("ev3dev.address")) {
 			String ip = properties.getProperty("ev3dev.address");
-			ev3DevUtils = new EV3DevUtils(ip);
+			String usr = properties.getProperty("ev3dev.usr");
+			String pwd = properties.getProperty("ev3dev.pwd");
+			ev3DevUtils = new EV3DevUtils(ip, usr, pwd);
 		}
 		String accessKey = properties.getProperty("AWS_ACCESS_KEY");
 		String secretKey = properties.getProperty("AWS_SECRET_KEY");
@@ -272,7 +274,7 @@ public class RobotUI extends JFrame {
 				if (lexOutput.startsWith("COMMAND: rekognition")) {
 					int threshold = 50;
 					String command = lexOutput.substring(20).trim();
-					if (command.equals("labels")) {
+					if (command.startsWith("label")) {
 						Image image = takePicture();
 						List<Label> labels = rekognition.detectLabels(image);
 						StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
@@ -330,7 +332,7 @@ public class RobotUI extends JFrame {
 						
 					}
 				} else if (lexOutput.startsWith("COMMAND: ev3dev")) {
-					String command = lexOutput.substring(15).trim();
+					String command = lexOutput.substring(15).trim().replace(" ", "_");
 					ev3DevUtils.execCommand(command);
 				} else {
 					talk(lexOutput);

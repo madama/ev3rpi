@@ -1,0 +1,18 @@
+killall -q -KILL python3
+rm -f ev3rpi.*
+mkfifo ev3rpi.in
+
+echo -ne "
+import time
+import ev3dev.ev3 as ev3
+ml = ev3.LargeMotor('outD')
+mr = ev3.LargeMotor('outC')
+mh = ev3.MediumMotor('outB')
+while True:
+\texec(open(\"ev3rpi.in\").read())
+\ttime.sleep(1)
+" > ev3rpi.py
+
+nohup python3 ev3rpi.py > ev3rpi.out 2> ev3rpi.err < /dev/null &
+
+echo "ev3.Sound.beep()" >> ev3rpi.in
