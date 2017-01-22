@@ -286,12 +286,7 @@ public class RobotUI extends JFrame {
 						talk(labelsText.toString());
 					} else if (command.startsWith("face")) {
 						camUtils.capture("capture.png");
-						Image image = new Image();
-						try {
-							image.setBytes(ByteBuffer.wrap(Files.readAllBytes(Paths.get("capture.png"))));
-						} catch (IOException e1) {
-							e1.printStackTrace(System.err);
-						}
+						Image image = takePicture();
 						List<FaceDetail> faces = rekognition.detectFaces(image);
 						StringBuffer facesText = new StringBuffer("In this face I can recognize: ");
 						for (FaceDetail f : faces) {
