@@ -4,6 +4,8 @@ import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import javax.imageio.ImageIO;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Line;
@@ -78,6 +81,7 @@ public class RobotUI extends JFrame {
 	private AudioInputStream audioIS;
 	private Mixer mixer;
 	private Map<String, String> mixers = new HashMap<String, String>();
+	private String collectionFaces;
 
 	private LexWrapper lex;
 	private PollyWrapper polly;
@@ -110,6 +114,8 @@ public class RobotUI extends JFrame {
 		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI");
 		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials), VoiceId.Brian);
 		rekognition = new RekognitionWrapper(new AmazonRekognitionClient(awsCredentials));
+		collectionFaces = properties.getProperty("rekognition.collection");
+		//rekognition.createCollection(collectionFaces);
 	}
 
 	private void draw() {
@@ -324,6 +330,7 @@ public class RobotUI extends JFrame {
 						}
 						talk(facesText.toString());
 					} else if (command.equals("SearchFacesByImage")) {
+						Image image = takePicture();
 						
 					}
 				} else if (lexOutput.startsWith("COMMAND: ev3dev")) {
@@ -349,7 +356,8 @@ public class RobotUI extends JFrame {
 		Image image = new Image();
 		try {
 			image.setBytes(ByteBuffer.wrap(Files.readAllBytes(Paths.get(fileName))));
-			snapshot.setIcon(new ImageIcon(fileName));
+			BufferedImage bufImg = ImageIO.read(new File(fileName));
+			snapshot.setIcon(new ImageIcon(bufImg));
 		} catch (IOException e1) {
 			e1.printStackTrace(System.err);
 		}
