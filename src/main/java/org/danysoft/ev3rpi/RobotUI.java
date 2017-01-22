@@ -1,8 +1,6 @@
 package org.danysoft.ev3rpi;
 
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
+import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -12,7 +10,9 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.sound.sampled.AudioInputStream;
@@ -20,14 +20,18 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Line;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
-import javax.swing.ButtonGroup;
-import javax.swing.JButton;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.GroupLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
+import javax.swing.JToggleButton;
+import javax.swing.LayoutStyle;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
@@ -59,13 +63,11 @@ public class RobotUI extends JFrame {
 
 	private Properties properties = new Properties();
 
-	private JPanel panel;
-	private JButton rec;
-	private JTabbedPane tabbedPane;
-	private JPanel tabPanel1;
+	private JToggleButton rec;
+	private JComboBox<String> mic;
 	private JTextArea commandLog;
-	private JPanel tabPanel2;
 	private JTextArea log;
+	private JLabel snapshot;
 
 	private OpenCVUtils cvUtils;
 	private CamUtils camUtils;
@@ -75,6 +77,7 @@ public class RobotUI extends JFrame {
 	private AudioRecorder recorder;
 	private AudioInputStream audioIS;
 	private Mixer mixer;
+	private Map<String, String> mixers = new HashMap<String, String>();
 
 	private LexWrapper lex;
 	private PollyWrapper polly;
@@ -109,96 +112,112 @@ public class RobotUI extends JFrame {
 
 	private void draw() {
 		setTitle("EV3 RPI");
-		setLocationRelativeTo(null);
-		panel = new JPanel();
+		setSize(1200, 530);
+		setMinimumSize(getSize());
+		setMaximumSize(getSize());
+		setPreferredSize(getSize());
+		setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-		GridBagLayout gbPanel = new GridBagLayout();
-		GridBagConstraints gbcPanel = new GridBagConstraints();
-		panel.setLayout(gbPanel);
-
-		rec = new JButton("REC");
-		gbcPanel.gridx = 0;
-		gbcPanel.gridy = 0;
-		gbcPanel.gridwidth = 1;
-		gbcPanel.gridheight = 1;
-		gbcPanel.fill = GridBagConstraints.BOTH;
-		gbcPanel.weightx = 1;
-		gbcPanel.weighty = 0;
-		gbcPanel.anchor = GridBagConstraints.NORTH;
-		gbPanel.setConstraints(rec, gbcPanel);
+		// REC
+		rec = new JToggleButton("REC");
+		rec.setText("Rec");
+		rec.setPreferredSize(new Dimension(120, 25));
 		rec.setMnemonic(KeyEvent.VK_R);
 		rec.addActionListener(new RecActionListener());
-		panel.add(rec);
 
-		JPanel buttonPanel = new JPanel(new GridLayout(0, 1));
-		ButtonGroup group = new ButtonGroup();
+		// MIC
+		mic = new JComboBox<String>();
 		Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
 		for (Mixer.Info info : mixerInfos) {
 			Mixer m = AudioSystem.getMixer(info);
 			Line.Info[] lineInfos = m.getTargetLineInfo();
 			if (lineInfos.length > 0 && lineInfos[0].getLineClass().equals(TargetDataLine.class)) {
-				JRadioButton button = new JRadioButton();
-				button.setText(info.getName());
-				button.setActionCommand(info.toString());
-				button.addActionListener(setInput);
-				buttonPanel.add(button);
-				group.add(button);
+				mixers.put(info.getName(), info.toString());
 			}
 		}
-		panel.add(buttonPanel);
+		mic.setModel(new DefaultComboBoxModel<String>(mixers.values().toArray(new String[] {})));
+		mic.addActionListener(setInput);
+		mic.setPreferredSize(new Dimension(387, 25));
 
-		tabbedPane = new JTabbedPane();
-		tabPanel1 = new JPanel();
-		GridBagLayout gbPanel1 = new GridBagLayout();
-		GridBagConstraints gbcPanel1 = new GridBagConstraints();
-		tabPanel1.setLayout(gbPanel1);
-		commandLog = new JTextArea(2, 10);
-		JScrollPane scpCommandLog = new JScrollPane(commandLog);
-		gbcPanel1.gridx = 0;
-		gbcPanel1.gridy = 0;
-		gbcPanel1.gridwidth = 18;
-		gbcPanel1.gridheight = 12;
-		gbcPanel1.fill = GridBagConstraints.BOTH;
-		gbcPanel1.weightx = 1;
-		gbcPanel1.weighty = 1;
-		gbcPanel1.anchor = GridBagConstraints.NORTH;
-		gbPanel1.setConstraints(scpCommandLog, gbcPanel1);
-		tabPanel1.add(scpCommandLog);
-		tabbedPane.addTab("Command", tabPanel1);
-		tabPanel2 = new JPanel();
-		GridBagLayout gbPanel2 = new GridBagLayout();
-		GridBagConstraints gbcPanel2 = new GridBagConstraints();
-		tabPanel2.setLayout(gbPanel2);
-		log = new JTextArea(2, 10);
-		JScrollPane scpLog = new JScrollPane(log);
-		gbcPanel2.gridx = 0;
-		gbcPanel2.gridy = 0;
-		gbcPanel2.gridwidth = 18;
-		gbcPanel2.gridheight = 12;
-		gbcPanel2.fill = GridBagConstraints.BOTH;
-		gbcPanel2.weightx = 1;
-		gbcPanel2.weighty = 1;
-		gbcPanel2.anchor = GridBagConstraints.NORTH;
-		gbPanel2.setConstraints(scpLog, gbcPanel2);
-		tabPanel2.add(scpLog);
-		tabbedPane.addTab("Log", tabPanel2);
-		gbcPanel.gridx = 0;
-		gbcPanel.gridy = 1;
-		gbcPanel.gridwidth = 1;
-		gbcPanel.gridheight = 1;
-		gbcPanel.fill = GridBagConstraints.BOTH;
-		gbcPanel.weightx = 1;
-		gbcPanel.weighty = 1;
-		gbcPanel.anchor = GridBagConstraints.NORTH;
-		gbPanel.setConstraints(tabbedPane, gbcPanel);
-		tabbedPane.setMnemonicAt(0, KeyEvent.VK_C);
-		tabbedPane.setMnemonicAt(1, KeyEvent.VK_L);
-		panel.add(tabbedPane);
+		// LOGS
+		JTabbedPane logs = new JTabbedPane();
+		JPanel commandPanel = new JPanel();
+		JScrollPane scpCommandLog = new JScrollPane();
+		commandLog = new JTextArea();
+		commandLog.setColumns(20);
+		commandLog.setRows(5);
 
-		setContentPane(panel);
+		scpCommandLog.setViewportView(commandLog);
+		GroupLayout commandPanelLayout = new GroupLayout(commandPanel);
+		commandPanel.setLayout(commandPanelLayout);
+		commandPanelLayout.setHorizontalGroup(
+				commandPanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(scpCommandLog));
+		commandPanelLayout.setVerticalGroup(commandPanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING)
+				.addComponent(scpCommandLog, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE));
+		logs.addTab("Command", commandPanel);
+
+		JPanel logPanel = new JPanel();
+		JScrollPane scpLog = new JScrollPane();
+		log = new JTextArea();
+		log.setColumns(20);
+		log.setRows(5);
+
+		scpLog.setViewportView(log);
+		GroupLayout logPanelLayout = new GroupLayout(logPanel);
+		logPanel.setLayout(logPanelLayout);
+		logPanelLayout.setHorizontalGroup(
+				logPanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(scpLog));
+		logPanelLayout.setVerticalGroup(logPanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING)
+				.addComponent(scpLog, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE));
+		logs.addTab("Log", logPanel);
+
+		logs.setMnemonicAt(0, KeyEvent.VK_C);
+		logs.setMnemonicAt(1, KeyEvent.VK_L);
+
+		// SNAPSHOT
+		JPanel imagePanel = new JPanel();
+		imagePanel.setMaximumSize(new Dimension(640, 480));
+		imagePanel.setPreferredSize(new Dimension(640, 480));
+		imagePanel.setSize(640, 480);
+		snapshot = new JLabel(new ImageIcon(getClass().getResource("/splashscreen.png")));
+		imagePanel.add(snapshot);
+
+		GroupLayout imagePanelLayout = new GroupLayout(imagePanel);
+		imagePanel.setLayout(imagePanelLayout);
+		imagePanelLayout.setHorizontalGroup(imagePanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING)
+				.addComponent(snapshot, GroupLayout.DEFAULT_SIZE, 624, Short.MAX_VALUE));
+		imagePanelLayout.setVerticalGroup(imagePanelLayout.createParallelGroup(GroupLayout.Alignment.LEADING)
+				.addComponent(snapshot, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE));
+
+		// LAYOUT
+		GroupLayout layout = new GroupLayout(getContentPane());
+		getContentPane().setLayout(layout);
+		layout.setHorizontalGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+				.addGroup(layout.createSequentialGroup().addContainerGap()
+						.addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+								.addGroup(layout.createSequentialGroup()
+										.addComponent(rec, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+												GroupLayout.PREFERRED_SIZE)
+										.addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED).addComponent(mic,
+												GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+												GroupLayout.PREFERRED_SIZE))
+								.addComponent(logs))
+						.addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+						.addComponent(imagePanel, GroupLayout.DEFAULT_SIZE, 624, Short.MAX_VALUE).addContainerGap()));
+		layout.setVerticalGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING).addGroup(layout
+				.createSequentialGroup().addContainerGap()
+				.addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING).addGroup(layout
+						.createSequentialGroup()
+						.addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
+								.addComponent(rec, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+										GroupLayout.PREFERRED_SIZE)
+								.addComponent(mic, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+										GroupLayout.PREFERRED_SIZE))
+						.addPreferredGap(LayoutStyle.ComponentPlacement.RELATED).addComponent(logs))
+						.addComponent(imagePanel, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+				.addContainerGap()));
+
 		pack();
-		setSize(600, 400);
-		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		appendLog("UI Complete!");
 	}
 
@@ -215,9 +234,11 @@ public class RobotUI extends JFrame {
 
 	private ActionListener setInput = new ActionListener() {
 		@Override
-		public void actionPerformed(ActionEvent arg0) {
+		@SuppressWarnings("unchecked")
+		public void actionPerformed(ActionEvent event) {
+			String selected = ((JComboBox<String>)event.getSource()).getSelectedItem().toString();
 			for (Mixer.Info info : AudioSystem.getMixerInfo()) {
-				if (arg0.getActionCommand().equals(info.toString())) {
+				if (selected.equals(info.toString())) {
 					Mixer newValue = AudioSystem.getMixer(info);
 					mixer = newValue;
 					break;
@@ -230,7 +251,6 @@ public class RobotUI extends JFrame {
 		@Override
 		public void actionPerformed(ActionEvent event) {
 			if (recorder == null) {
-				((JButton)event.getSource()).setText("RECORDING...");
 				appendLog("Start Audio Recording...");
 				recorder = audioUtils.startRecording(mixer);
 			} else {
@@ -242,7 +262,6 @@ public class RobotUI extends JFrame {
 						appendLog("ERROR: " + err.getMessage());
 					}
 				}
-				((JButton)event.getSource()).setText("REC");
 				audioIS = recorder.getAudioInputStream();
 				appendLog("Audio Recording Complete! " + recorder.getDuration());
 				recorder = null;
@@ -254,13 +273,7 @@ public class RobotUI extends JFrame {
 					int threshold = 50;
 					String command = lexOutput.substring(20).trim();
 					if (command.equals("labels")) {
-						camUtils.capture("capture.png");
-						Image image = new Image();
-						try {
-							image.setBytes(ByteBuffer.wrap(Files.readAllBytes(Paths.get("capture.png"))));
-						} catch (IOException e1) {
-							e1.printStackTrace(System.err);
-						}
+						Image image = takePicture();
 						List<Label> labels = rekognition.detectLabels(image);
 						StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
 						for (Label l : labels) {
@@ -269,7 +282,7 @@ public class RobotUI extends JFrame {
 							}
 						}
 						talk(labelsText.toString());
-					} else if (command.equals("face")) {
+					} else if (command.startsWith("face")) {
 						camUtils.capture("capture.png");
 						Image image = new Image();
 						try {
@@ -333,4 +346,16 @@ public class RobotUI extends JFrame {
 		audioUtils.playAudio("fromPolly.wav");
 	}
 
+	private Image takePicture() {
+		String fileName = "capture.png";
+		camUtils.capture(fileName);
+		Image image = new Image();
+		try {
+			image.setBytes(ByteBuffer.wrap(Files.readAllBytes(Paths.get(fileName))));
+			snapshot.setIcon(new ImageIcon(fileName));
+		} catch (IOException e1) {
+			e1.printStackTrace(System.err);
+		}
+		return image;
+	}
 }
