@@ -18,7 +18,6 @@ public class PollyWrapper {
 	public PollyWrapper(AmazonPolly polly, VoiceId voice) {
 		this.polly = polly;
 		this.voice = voice;
-		this.polly.setRegion(Region.getRegion(Regions.EU_WEST_1));
 	}
 
 	public InputStream tts(String text) {

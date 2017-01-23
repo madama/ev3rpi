@@ -7,8 +7,10 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -41,14 +43,23 @@ import javax.swing.UIManager;
 import org.danysoft.ev3rpi.AudioUtils.AudioRecorder;
 
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.regions.Region;
+import com.amazonaws.regions.Regions;
 import com.amazonaws.services.lexrts.AmazonLexRuntimeClient;
 import com.amazonaws.services.polly.AmazonPollyClient;
 import com.amazonaws.services.polly.model.VoiceId;
 import com.amazonaws.services.rekognition.AmazonRekognitionClient;
 import com.amazonaws.services.rekognition.model.Emotion;
 import com.amazonaws.services.rekognition.model.FaceDetail;
+import com.amazonaws.services.rekognition.model.FaceMatch;
+import com.amazonaws.services.rekognition.model.FaceRecord;
 import com.amazonaws.services.rekognition.model.Image;
 import com.amazonaws.services.rekognition.model.Label;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.util.StringInputStream;
+
+import net.schmizz.sshj.common.IOUtils;
 
 public class RobotUI extends JFrame {
 
@@ -82,10 +93,12 @@ public class RobotUI extends JFrame {
 	private Mixer mixer;
 	private Map<String, String> mixers = new HashMap<String, String>();
 	private String collectionFaces;
+	private String facesBucket;
 
 	private LexWrapper lex;
 	private PollyWrapper polly;
 	private RekognitionWrapper rekognition;
+	private S3Wrapper s3;
 
 	public RobotUI() {
 		init();
@@ -111,11 +124,14 @@ public class RobotUI extends JFrame {
 		String secretKey = properties.getProperty("AWS_SECRET_KEY");
 		BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
 		com.amazonaws.android.auth.BasicAWSCredentials lexCredentials = new com.amazonaws.android.auth.BasicAWSCredentials(accessKey, secretKey);
-		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI");
-		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials), VoiceId.Brian);
-		rekognition = new RekognitionWrapper(new AmazonRekognitionClient(awsCredentials));
+		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI", "awsdemo");
+		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials).withRegion(Region.getRegion(Regions.EU_WEST_1)), VoiceId.Brian);
+		rekognition = new RekognitionWrapper(new AmazonRekognitionClient(awsCredentials).withRegion(Region.getRegion(Regions.EU_WEST_1)));
+		s3 = new S3Wrapper(new AmazonS3Client(awsCredentials).withRegion(Region.getRegion(Regions.EU_WEST_1)));
 		collectionFaces = properties.getProperty("rekognition.collection");
+		facesBucket = properties.getProperty("rekognition.faces.bucket");
 		//rekognition.createCollection(collectionFaces);
+		//rekognition.deleteCollection(collectionFaces);
 	}
 
 	private void draw() {
@@ -331,7 +347,62 @@ public class RobotUI extends JFrame {
 						talk(facesText.toString());
 					} else if (command.equals("SearchFacesByImage")) {
 						Image image = takePicture();
-						
+						List<FaceMatch> matches = rekognition.searchFacesByImage(collectionFaces, image);
+						//System.out.println(matches);
+						Map<String, Integer> occurrencies = new HashMap<String, Integer>();
+						for (FaceMatch fm : matches) {
+							String fId = fm.getFace().getFaceId().replaceAll("-", "_");
+							if (s3.exist(facesBucket, fId)) {
+								String faceName = null;
+								S3Object s3Obj = s3.get(facesBucket, fId);
+								try {
+									faceName = IOUtils.readFully(s3Obj.getObjectContent()).toString();
+								} catch (IOException e) {
+									e.printStackTrace(System.err);
+								}
+								//System.out.println(faceName);
+								Integer occ = occurrencies.get(faceName);
+								if (occ == null) {
+									occurrencies.put(faceName, 1);
+								} else {
+									occurrencies.put(faceName, occ.intValue() + 1);
+								}
+							}
+						}
+						//System.out.println(occurrencies);
+						String faceId = "";
+						String faceName = "";
+						List<FaceRecord> faceRecords = rekognition.indexFaces(collectionFaces, image);
+						//System.out.println(faceRecords);
+						for (FaceRecord f : faceRecords) {
+							faceId = f.getFace().getFaceId().replaceAll("-", "_");
+							break; //TODO: Handle more faces
+						}
+						if (!occurrencies.isEmpty()) {
+							int occ = 0;
+							for (String key : occurrencies.keySet()) {
+								if (occurrencies.get(key).intValue() > occ) {
+									faceName = key;
+								}
+							}
+							String recognized = "Hi " + faceName + "!";
+							talk(recognized);
+							saveFaceName(faceId, faceName);
+						} else {
+							String out = lex.sendText("COMMAND Ask Name");
+							if (out.equals("Your Face ID?")) {
+								out = lex.sendText(faceId);
+								if (out.equals("What's your name?")) {
+									talk(out);
+								}
+							}
+						}
+					} else if (command.startsWith("associate ")) {
+						String faceID = command.split(" ")[1];
+						String userName = command.substring(10 + faceID.length() + 1);
+						saveFaceName(faceID, userName);
+						String recognized = "Good, " + userName + ", see you next time!";
+						talk(recognized);
 					}
 				} else if (lexOutput.startsWith("COMMAND: ev3dev")) {
 					String command = lexOutput.substring(15).trim().replace(" ", "_");
@@ -343,11 +414,18 @@ public class RobotUI extends JFrame {
 		}
 	}
 
-	private void talk(String text) {
+	private InputStream talk(String text) {
+		return talk(text, true);
+	}
+
+	private InputStream talk(String text, boolean play) {
 		appendLog("Send text to Polly: " + text);
 		InputStream tts = polly.tts(text);
 		audioUtils.saveAudio("fromPolly.wav", tts);
-		audioUtils.playAudio("fromPolly.wav");
+		if (play) {
+			audioUtils.playAudio("fromPolly.wav");
+		}
+		return tts;
 	}
 
 	private Image takePicture() {
@@ -363,4 +441,13 @@ public class RobotUI extends JFrame {
 		}
 		return image;
 	}
+
+	private void saveFaceName(String faceId, String faceName) {
+		try {
+			s3.put(new StringInputStream(faceName), facesBucket, faceId);
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace(System.err);
+		}
+	}
+
 }

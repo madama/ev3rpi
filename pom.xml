@@ -8,7 +8,7 @@
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <aws.version>1.11.80</aws.version>
+    <aws.version>1.11.83</aws.version>
   </properties>
   <dependencies>
     <dependency>
@@ -33,6 +33,11 @@
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-rekognition</artifactId>
+      <version>${aws.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-s3</artifactId>
       <version>${aws.version}</version>
     </dependency>
     <dependency>
