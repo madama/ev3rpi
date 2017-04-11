@@ -7,7 +7,6 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -42,12 +41,16 @@ import javax.swing.UIManager;
 
 import org.danysoft.ev3rpi.AudioUtils.AudioRecorder;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.lexrts.AmazonLexRuntimeClient;
+import com.amazonaws.services.lexruntime.AmazonLexRuntime;
+import com.amazonaws.services.lexruntime.AmazonLexRuntimeClient;
+import com.amazonaws.services.polly.AmazonPolly;
 import com.amazonaws.services.polly.AmazonPollyClient;
 import com.amazonaws.services.polly.model.VoiceId;
+import com.amazonaws.services.rekognition.AmazonRekognition;
 import com.amazonaws.services.rekognition.AmazonRekognitionClient;
 import com.amazonaws.services.rekognition.model.Emotion;
 import com.amazonaws.services.rekognition.model.FaceDetail;
@@ -55,6 +58,7 @@ import com.amazonaws.services.rekognition.model.FaceMatch;
 import com.amazonaws.services.rekognition.model.FaceRecord;
 import com.amazonaws.services.rekognition.model.Image;
 import com.amazonaws.services.rekognition.model.Label;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.util.StringInputStream;
@@ -122,12 +126,15 @@ public class RobotUI extends JFrame {
 		}
 		String accessKey = properties.getProperty("AWS_ACCESS_KEY");
 		String secretKey = properties.getProperty("AWS_SECRET_KEY");
-		BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-		com.amazonaws.android.auth.BasicAWSCredentials lexCredentials = new com.amazonaws.android.auth.BasicAWSCredentials(accessKey, secretKey);
-		lex = new LexWrapper(new AmazonLexRuntimeClient(lexCredentials), "LegoRPI", "EveRPI", "awsdemo");
-		polly = new PollyWrapper(new AmazonPollyClient(awsCredentials).withRegion(Region.getRegion(Regions.EU_WEST_1)), VoiceId.Brian);
-		rekognition = new RekognitionWrapper(new AmazonRekognitionClient(awsCredentials).withRegion(Region.getRegion(Regions.EU_WEST_1)));
-		s3 = new S3Wrapper(new AmazonS3Client(awsCredentials).withRegion(Region.getRegion(Regions.EU_WEST_1)));
+		AWSCredentialsProvider awsCredentials = new AWSStaticCredentialsProvider(new BasicAWSCredentials(accessKey, secretKey));
+		AmazonLexRuntime lexClient = AmazonLexRuntimeClient.builder().withRegion(Regions.US_EAST_1).withCredentials(awsCredentials).build();
+		lex = new LexWrapper(lexClient, "LegoRPI", "EveRPI", "awsdemo");;
+		AmazonPolly pollyClient = AmazonPollyClient.builder().withRegion(Regions.EU_WEST_1).withCredentials(awsCredentials).build();
+		polly = new PollyWrapper(pollyClient, VoiceId.Brian);
+		AmazonRekognition rekognitionClient = AmazonRekognitionClient.builder().withRegion(Regions.EU_WEST_1).withCredentials(awsCredentials).build();
+		rekognition = new RekognitionWrapper(rekognitionClient);
+		AmazonS3 s3Client = AmazonS3Client.builder().withRegion(Regions.EU_WEST_1).withCredentials(awsCredentials).build();
+		s3 = new S3Wrapper(s3Client);
 		collectionFaces = properties.getProperty("rekognition.collection");
 		facesBucket = properties.getProperty("rekognition.faces.bucket");
 		//rekognition.createCollection(collectionFaces);
@@ -296,7 +303,7 @@ public class RobotUI extends JFrame {
 				if (lexOutput.startsWith("COMMAND: rekognition")) {
 					int threshold = 50;
 					String command = lexOutput.substring(20).trim();
-					if (command.startsWith("label")) {
+					if (command.contains("label")) {
 						Image image = takePicture();
 						List<Label> labels = rekognition.detectLabels(image);
 						StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
@@ -306,8 +313,7 @@ public class RobotUI extends JFrame {
 							}
 						}
 						talk(labelsText.toString());
-					} else if (command.startsWith("face")) {
-						camUtils.capture("capture.png");
+					} else if (command.contains("face")) {
 						Image image = takePicture();
 						List<FaceDetail> faces = rekognition.detectFaces(image);
 						StringBuffer facesText = new StringBuffer("In this face I can recognize: ");

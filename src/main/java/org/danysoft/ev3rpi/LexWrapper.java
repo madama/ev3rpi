@@ -2,11 +2,11 @@ package org.danysoft.ev3rpi;
 
 import java.io.InputStream;
 
-import com.amazonaws.services.lexrts.AmazonLexRuntime;
-import com.amazonaws.services.lexrts.model.PostContentRequest;
-import com.amazonaws.services.lexrts.model.PostContentResult;
-import com.amazonaws.services.lexrts.model.PostTextRequest;
-import com.amazonaws.services.lexrts.model.PostTextResult;
+import com.amazonaws.services.lexruntime.AmazonLexRuntime;
+import com.amazonaws.services.lexruntime.model.PostContentRequest;
+import com.amazonaws.services.lexruntime.model.PostContentResult;
+import com.amazonaws.services.lexruntime.model.PostTextRequest;
+import com.amazonaws.services.lexruntime.model.PostTextResult;
 
 public class LexWrapper {
 

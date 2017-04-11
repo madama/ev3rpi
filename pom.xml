@@ -8,10 +8,17 @@
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <aws.version>1.11.83</aws.version>
+    <aws.version>1.11.117</aws.version>
   </properties>
   <dependencies>
-    <dependency>
+    <!--dependency>
+      <groupId>com.amazon</groupId>
+      <artifactId>alexa-avs</artifactId>
+      <version>20160207.2</version>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/sample-java-client-20160207.2.jar</systemPath>
+    </dependency-->
+    <!--dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-android-sdk-core</artifactId>
       <version>2.3.8</version>
@@ -24,6 +31,11 @@
       <version>2.3.8</version>
       <scope>system</scope>
       <systemPath>${basedir}/lib/aws-android-sdk-lex-2.3.8.jar</systemPath>
+    </dependency-->
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-lex</artifactId>
+      <version>${aws.version}</version>
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>
