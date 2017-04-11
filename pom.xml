@@ -18,20 +18,6 @@
       <scope>system</scope>
       <systemPath>${basedir}/lib/sample-java-client-20160207.2.jar</systemPath>
     </dependency-->
-    <!--dependency>
-      <groupId>com.amazonaws</groupId>
-      <artifactId>aws-android-sdk-core</artifactId>
-      <version>2.3.8</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/aws-android-sdk-core-2.3.8.jar</systemPath>
-    </dependency>
-    <dependency>
-      <groupId>com.amazonaws</groupId>
-      <artifactId>aws-android-sdk-lex</artifactId>
-      <version>2.3.8</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/aws-android-sdk-lex-2.3.8.jar</systemPath>
-    </dependency-->
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-lex</artifactId>
