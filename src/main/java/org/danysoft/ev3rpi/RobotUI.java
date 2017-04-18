@@ -53,6 +53,7 @@ import com.amazonaws.services.polly.model.VoiceId;
 import com.amazonaws.services.rekognition.AmazonRekognition;
 import com.amazonaws.services.rekognition.AmazonRekognitionClient;
 import com.amazonaws.services.rekognition.model.Emotion;
+import com.amazonaws.services.rekognition.model.Face;
 import com.amazonaws.services.rekognition.model.FaceDetail;
 import com.amazonaws.services.rekognition.model.FaceMatch;
 import com.amazonaws.services.rekognition.model.FaceRecord;
@@ -137,8 +138,8 @@ public class RobotUI extends JFrame {
 		s3 = new S3Wrapper(s3Client);
 		collectionFaces = properties.getProperty("rekognition.collection");
 		facesBucket = properties.getProperty("rekognition.faces.bucket");
-		//rekognition.createCollection(collectionFaces);
-		//rekognition.deleteCollection(collectionFaces);
+		rekognition.deleteCollection(collectionFaces);
+		rekognition.createCollection(collectionFaces);
 	}
 
 	private void draw() {
@@ -357,7 +358,7 @@ public class RobotUI extends JFrame {
 						//System.out.println(matches);
 						Map<String, Integer> occurrencies = new HashMap<String, Integer>();
 						for (FaceMatch fm : matches) {
-							String fId = fm.getFace().getFaceId().replaceAll("-", "_");
+							String fId = getFaceID(fm.getFace());
 							if (s3.exist(facesBucket, fId)) {
 								String faceName = null;
 								S3Object s3Obj = s3.get(facesBucket, fId);
@@ -381,7 +382,7 @@ public class RobotUI extends JFrame {
 						List<FaceRecord> faceRecords = rekognition.indexFaces(collectionFaces, image);
 						//System.out.println(faceRecords);
 						for (FaceRecord f : faceRecords) {
-							faceId = f.getFace().getFaceId().replaceAll("-", "_");
+							faceId = getFaceID(f.getFace());
 							break; //TODO: Handle more faces
 						}
 						if (!occurrencies.isEmpty()) {
@@ -454,6 +455,11 @@ public class RobotUI extends JFrame {
 		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace(System.err);
 		}
+	}
+
+	private String getFaceID(Face face) {
+		return face.getFaceId().replaceAll("-", "_");
+		//return face.getFaceId().substring(0, 8);
 	}
 
 }
