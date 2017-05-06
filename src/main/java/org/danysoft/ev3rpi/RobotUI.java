@@ -83,6 +83,7 @@ public class RobotUI extends JFrame {
 	private Properties properties = new Properties();
 
 	private JToggleButton rec;
+	private JToggleButton auto;
 	private JComboBox<String> mic;
 	private JTextArea commandLog;
 	private JTextArea log;
@@ -99,6 +100,7 @@ public class RobotUI extends JFrame {
 	private Map<String, String> mixers = new HashMap<String, String>();
 	private String collectionFaces;
 	private String facesBucket;
+	private boolean alternate = false;
 
 	private LexWrapper lex;
 	private PollyWrapper polly;
@@ -157,6 +159,14 @@ public class RobotUI extends JFrame {
 		rec.setMnemonic(KeyEvent.VK_R);
 		rec.addActionListener(new RecActionListener());
 
+		// Auto
+		auto = new JToggleButton("Auto");
+		auto.setText("Auto");
+		auto.setPreferredSize(new Dimension(120, 25));
+		auto.setMnemonic(KeyEvent.VK_A);
+		auto.addActionListener(new AutoActionListener());
+		rec = auto;
+
 		// MIC
 		mic = new JComboBox<String>();
 		Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
@@ -193,6 +203,7 @@ public class RobotUI extends JFrame {
 		log = new JTextArea();
 		log.setColumns(20);
 		log.setRows(5);
+		log.setLineWrap(true);
 
 		scpLog.setViewportView(log);
 		GroupLayout logPanelLayout = new GroupLayout(logPanel);
@@ -305,53 +316,9 @@ public class RobotUI extends JFrame {
 					int threshold = 50;
 					String command = lexOutput.substring(20).trim();
 					if (command.contains("label")) {
-						Image image = takePicture();
-						List<Label> labels = rekognition.detectLabels(image);
-						StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
-						for (Label l : labels) {
-							if (l.getConfidence().intValue() > threshold) {
-								labelsText.append(l.getName()).append(", ");
-							}
-						}
-						talk(labelsText.toString());
+						recognizeLabels(threshold);
 					} else if (command.contains("face")) {
-						Image image = takePicture();
-						List<FaceDetail> faces = rekognition.detectFaces(image);
-						StringBuffer facesText = new StringBuffer("In this face I can recognize: ");
-						for (FaceDetail f : faces) {
-							facesText.append("face! ");
-							if (f.getBeard().getConfidence().intValue() > threshold && f.getBeard().isValue()) {
-								facesText.append("beard, ");
-							}
-							List<Emotion> emotions = f.getEmotions();
-							for (Emotion e : emotions) {
-								if (e.getConfidence().intValue() > threshold) {
-									facesText.append(e.getType()).append(", ");
-								}
-							}
-							if (f.getEyeglasses().getConfidence().intValue() > threshold && f.getEyeglasses().isValue()) {
-								facesText.append("eyeglasses, ");
-							}
-							if (f.getEyesOpen().getConfidence().intValue() > threshold && f.getEyesOpen().isValue()) {
-								facesText.append("eyes open, ");
-							}
-							if (f.getGender().getConfidence().intValue() > threshold) {
-								facesText.append(f.getGender().getValue()).append(", ");
-							}
-							if (f.getMouthOpen().getConfidence().intValue() > threshold && f.getMouthOpen().isValue()) {
-								facesText.append("mouth open, ");
-							}
-							if (f.getMustache().getConfidence().intValue() > threshold && f.getMustache().isValue()) {
-								facesText.append("mustache, ");
-							}
-							if (f.getSmile().getConfidence().intValue() > threshold && f.getSmile().isValue()) {
-								facesText.append("smile, ");
-							}
-							if (f.getSunglasses().getConfidence().intValue() > threshold && f.getSunglasses().isValue()) {
-								facesText.append("sunglasses, ");
-							}
-						}
-						talk(facesText.toString());
+						recognizeFaces(threshold);
 					} else if (command.equals("SearchFacesByImage")) {
 						Image image = takePicture();
 						List<FaceMatch> matches = rekognition.searchFacesByImage(collectionFaces, image);
@@ -419,6 +386,72 @@ public class RobotUI extends JFrame {
 				}
 			}
 		}
+	}
+
+	private class AutoActionListener implements ActionListener {
+		@Override
+		public void actionPerformed(ActionEvent event) {
+			auto.setSelected(false);
+			if (alternate) {
+				recognizeLabels(50);
+				alternate = false;
+			} else {
+				recognizeFaces(50);
+				alternate = true;
+			}
+		}
+	}
+
+	private void recognizeLabels(int threshold) {
+		Image image = takePicture();
+		List<Label> labels = rekognition.detectLabels(image);
+		StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
+		for (Label l : labels) {
+			if (l.getConfidence().intValue() > threshold) {
+				labelsText.append(l.getName()).append(", ");
+			}
+		}
+		talk(labelsText.toString());
+	}
+
+	private void recognizeFaces(int threshold) {
+		Image image = takePicture();
+		List<FaceDetail> faces = rekognition.detectFaces(image);
+		StringBuffer facesText = new StringBuffer("In this face I can recognize: ");
+		for (FaceDetail f : faces) {
+			facesText.append("face! ");
+			if (f.getBeard().getConfidence().intValue() > threshold && f.getBeard().isValue()) {
+				facesText.append("beard, ");
+			}
+			List<Emotion> emotions = f.getEmotions();
+			for (Emotion e : emotions) {
+				if (e.getConfidence().intValue() > threshold) {
+					facesText.append(e.getType()).append(", ");
+				}
+			}
+			if (f.getEyeglasses().getConfidence().intValue() > threshold && f.getEyeglasses().isValue()) {
+				facesText.append("eyeglasses, ");
+			}
+			if (f.getEyesOpen().getConfidence().intValue() > threshold && f.getEyesOpen().isValue()) {
+				facesText.append("eyes open, ");
+			}
+			if (f.getGender().getConfidence().intValue() > threshold) {
+				facesText.append(f.getGender().getValue()).append(", ");
+			}
+			if (f.getMouthOpen().getConfidence().intValue() > threshold && f.getMouthOpen().isValue()) {
+				facesText.append("mouth open, ");
+			}
+			if (f.getMustache().getConfidence().intValue() > threshold && f.getMustache().isValue()) {
+				facesText.append("mustache, ");
+			}
+			if (f.getSmile().getConfidence().intValue() > threshold && f.getSmile().isValue()) {
+				facesText.append("smile, ");
+			}
+			if (f.getSunglasses().getConfidence().intValue() > threshold && f.getSunglasses().isValue()) {
+				facesText.append("sunglasses, ");
+			}
+		}
+		talk(facesText.toString());
 	}
 
 	private InputStream talk(String text) {
