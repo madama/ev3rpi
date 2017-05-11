@@ -92,20 +92,19 @@ public class RobotUI extends JFrame {
 	private OpenCVUtils cvUtils;
 	private CamUtils camUtils;
 	private AudioUtils audioUtils;
-	private EV3DevUtils ev3DevUtils;
+	protected EV3DevUtils ev3DevUtils;
 
 	private AudioRecorder recorder;
-	private AudioInputStream audioIS;
 	private Mixer mixer;
 	private Map<String, String> mixers = new HashMap<String, String>();
 	private String collectionFaces;
 	private String facesBucket;
-	private boolean alternate = false;
+	private AutoRun autorun;
 
-	private LexWrapper lex;
-	private PollyWrapper polly;
-	private RekognitionWrapper rekognition;
-	private S3Wrapper s3;
+	protected LexWrapper lex;
+	protected PollyWrapper polly;
+	protected RekognitionWrapper rekognition;
+	protected S3Wrapper s3;
 
 	public RobotUI() {
 		init();
@@ -140,8 +139,8 @@ public class RobotUI extends JFrame {
 		s3 = new S3Wrapper(s3Client);
 		collectionFaces = properties.getProperty("rekognition.collection");
 		facesBucket = properties.getProperty("rekognition.faces.bucket");
-		rekognition.deleteCollection(collectionFaces);
-		rekognition.createCollection(collectionFaces);
+		//rekognition.deleteCollection(collectionFaces);
+		//rekognition.createCollection(collectionFaces);
 	}
 
 	private void draw() {
@@ -165,6 +164,7 @@ public class RobotUI extends JFrame {
 		auto.setPreferredSize(new Dimension(120, 25));
 		auto.setMnemonic(KeyEvent.VK_A);
 		auto.addActionListener(new AutoActionListener());
+		autorun = new AutoRun(this);
 		rec = auto;
 
 		// MIC
@@ -294,20 +294,9 @@ public class RobotUI extends JFrame {
 		@Override
 		public void actionPerformed(ActionEvent event) {
 			if (recorder == null) {
-				appendLog("Start Audio Recording...");
-				recorder = audioUtils.startRecording(mixer);
+				startAudioRecording();
 			} else {
-				recorder.stop();
-				while (!recorder.isDone()) {
-					try {
-						Thread.sleep(10);
-					} catch (InterruptedException err) {
-						appendLog("ERROR: " + err.getMessage());
-					}
-				}
-				audioIS = recorder.getAudioInputStream();
-				appendLog("Audio Recording Complete! " + recorder.getDuration());
-				recorder = null;
+				AudioInputStream audioIS = stopAudioRecording();
 				audioUtils.saveAudio("fromMic.wav", audioIS);
 				appendLog("Send audio to Lex");
 				String lexOutput = lex.sendAudio(audioIS);
@@ -316,56 +305,21 @@ public class RobotUI extends JFrame {
 					int threshold = 50;
 					String command = lexOutput.substring(20).trim();
 					if (command.contains("label")) {
-						recognizeLabels(threshold);
+						Image image = takePicture();
+						recognizeLabels(image, threshold);
 					} else if (command.contains("face")) {
-						recognizeFaces(threshold);
+						Image image = takePicture();
+						recognizeFaces(image, threshold);
 					} else if (command.equals("SearchFacesByImage")) {
 						Image image = takePicture();
-						List<FaceMatch> matches = rekognition.searchFacesByImage(collectionFaces, image);
-						//System.out.println(matches);
-						Map<String, Integer> occurrencies = new HashMap<String, Integer>();
-						for (FaceMatch fm : matches) {
-							String fId = getFaceID(fm.getFace());
-							if (s3.exist(facesBucket, fId)) {
-								String faceName = null;
-								S3Object s3Obj = s3.get(facesBucket, fId);
-								try {
-									faceName = IOUtils.readFully(s3Obj.getObjectContent()).toString();
-								} catch (IOException e) {
-									e.printStackTrace(System.err);
-								}
-								//System.out.println(faceName);
-								Integer occ = occurrencies.get(faceName);
-								if (occ == null) {
-									occurrencies.put(faceName, 1);
-								} else {
-									occurrencies.put(faceName, occ.intValue() + 1);
-								}
-							}
-						}
-						//System.out.println(occurrencies);
-						String faceId = "";
-						String faceName = "";
-						List<FaceRecord> faceRecords = rekognition.indexFaces(collectionFaces, image);
-						//System.out.println(faceRecords);
-						for (FaceRecord f : faceRecords) {
-							faceId = getFaceID(f.getFace());
-							break; //TODO: Handle more faces
-						}
-						if (!occurrencies.isEmpty()) {
-							int occ = 0;
-							for (String key : occurrencies.keySet()) {
-								if (occurrencies.get(key).intValue() > occ) {
-									faceName = key;
-								}
-							}
-							String recognized = "Hi " + faceName + "!";
+						Map<String, String> face = recognizeFace(image);
+						if (face.containsKey("faceName")) {
+							String recognized = "Hi " + face.get("faceName") + "!";
 							talk(recognized);
-							saveFaceName(faceId, faceName);
 						} else {
 							String out = lex.sendText("COMMAND Ask Name");
 							if (out.equals("Your Face ID?")) {
-								out = lex.sendText(faceId);
+								out = lex.sendText(face.get("faceId"));
 								if (out.equals("What's your name?")) {
 									talk(out);
 								}
@@ -388,46 +342,44 @@ public class RobotUI extends JFrame {
 		}
 	}
 
+	private Thread autoRunThread;
 	private class AutoActionListener implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent event) {
-			auto.setSelected(false);
-			if (alternate) {
-				recognizeLabels(50);
-				alternate = false;
+			if (!autorun.isRunning()) {
+				autoRunThread = new Thread(autorun);
+				autoRunThread.start();
 			} else {
-				recognizeFaces(50);
-				alternate = true;
+				auto.setSelected(false);
+				autorun.stop();
+				try {
+					autoRunThread.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}
 
-	private void recognizeLabels(int threshold) {
-		Image image = takePicture();
+	protected List<Label> recognizeLabels(Image image, int threshold) {
 		List<Label> labels = rekognition.detectLabels(image);
-		StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
+		StringBuffer labelsText = new StringBuffer("In this image I can recognize: ");
 		for (Label l : labels) {
 			if (l.getConfidence().intValue() > threshold) {
 				labelsText.append(l.getName()).append(", ");
 			}
 		}
 		talk(labelsText.toString());
+		return labels;
 	}
 
-	private void recognizeFaces(int threshold) {
-		Image image = takePicture();
+	protected List<FaceDetail> recognizeFaces(Image image, int threshold) {
 		List<FaceDetail> faces = rekognition.detectFaces(image);
-		StringBuffer facesText = new StringBuffer("In this face I can recognize: ");
+		StringBuffer facesText = new StringBuffer("In this photo I can recognize ");
 		for (FaceDetail f : faces) {
-			facesText.append("face! ");
+			facesText.append(" a face with: ");
 			if (f.getBeard().getConfidence().intValue() > threshold && f.getBeard().isValue()) {
 				facesText.append("beard, ");
-			}
-			List<Emotion> emotions = f.getEmotions();
-			for (Emotion e : emotions) {
-				if (e.getConfidence().intValue() > threshold) {
-					facesText.append(e.getType()).append(", ");
-				}
 			}
 			if (f.getEyeglasses().getConfidence().intValue() > threshold && f.getEyeglasses().isValue()) {
 				facesText.append("eyeglasses, ");
@@ -450,11 +402,66 @@ public class RobotUI extends JFrame {
 			if (f.getSunglasses().getConfidence().intValue() > threshold && f.getSunglasses().isValue()) {
 				facesText.append("sunglasses, ");
 			}
+			List<Emotion> emotions = f.getEmotions();
+			for (Emotion e : emotions) {
+				if (e.getConfidence().intValue() > threshold) {
+					facesText.append(e.getType()).append(", ");
+				}
+			}
+			facesText.append(". ");
 		}
-		talk(facesText.toString());
+		if (faces.size() > 0) {
+			talk(facesText.toString());
+		}
+		return faces;
 	}
 
-	private InputStream talk(String text) {
+	protected Map<String, String> recognizeFace(Image image) {
+		List<FaceMatch> matches = rekognition.searchFacesByImage(collectionFaces, image);
+		Map<String, Integer> occurrencies = new HashMap<String, Integer>();
+		for (FaceMatch fm : matches) {
+			String fId = getFaceID(fm.getFace());
+			if (s3.exist(facesBucket, fId)) {
+				String faceName = null;
+				S3Object s3Obj = s3.get(facesBucket, fId);
+				try {
+					faceName = IOUtils.readFully(s3Obj.getObjectContent()).toString();
+				} catch (IOException e) {
+					e.printStackTrace(System.err);
+				}
+				Integer occ = occurrencies.get(faceName);
+				if (occ == null) {
+					occurrencies.put(faceName, 1);
+				} else {
+					occurrencies.put(faceName, occ.intValue() + 1);
+				}
+			}
+		}
+		String faceId = "";
+		String faceName = "";
+		List<FaceRecord> faceRecords = rekognition.indexFaces(collectionFaces, image);
+		for (FaceRecord f : faceRecords) {
+			faceId = getFaceID(f.getFace());
+			break; //TODO: Handle more faces
+		}
+		if (!occurrencies.isEmpty()) {
+			int occ = 0;
+			for (String key : occurrencies.keySet()) {
+				if (occurrencies.get(key).intValue() > occ) {
+					faceName = key;
+				}
+			}
+			saveFaceName(faceId, faceName);
+		}
+		Map<String, String> result = new HashMap<String, String>();
+		result.put("faceId", faceId);
+		if (faceName.length() > 0) {
+			result.put("faceName", faceName);
+		}
+		return result;
+	}
+
+	protected InputStream talk(String text) {
 		return talk(text, true);
 	}
 
@@ -468,7 +475,7 @@ public class RobotUI extends JFrame {
 		return tts;
 	}
 
-	private Image takePicture() {
+	protected Image takePicture() {
 		String fileName = "capture.png";
 		camUtils.capture(fileName);
 		Image image = new Image();
@@ -482,7 +489,7 @@ public class RobotUI extends JFrame {
 		return image;
 	}
 
-	private void saveFaceName(String faceId, String faceName) {
+	protected void saveFaceName(String faceId, String faceName) {
 		try {
 			s3.put(new StringInputStream(faceName), facesBucket, faceId);
 		} catch (UnsupportedEncodingException e) {
@@ -492,7 +499,27 @@ public class RobotUI extends JFrame {
 
 	private String getFaceID(Face face) {
 		return face.getFaceId().replaceAll("-", "_");
-		//return face.getFaceId().substring(0, 8);
+	}
+
+	protected AudioRecorder startAudioRecording() {
+		appendLog("Start Audio Recording...");
+		recorder = audioUtils.startRecording(mixer);
+		return recorder;
+	}
+
+	protected AudioInputStream stopAudioRecording() {
+		recorder.stop();
+		while (!recorder.isDone()) {
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException err) {
+				appendLog("ERROR: " + err.getMessage());
+			}
+		}
+		AudioInputStream audioIS = recorder.getAudioInputStream();
+		appendLog("Audio Recording Complete! " + recorder.getDuration());
+		recorder = null;
+		return audioIS;
 	}
 
 }
