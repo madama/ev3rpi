@@ -33,17 +33,21 @@ public class AutoRun implements Runnable {
 				if (rand < 1) {
 					ui.appendLog("Left");
 					ui.ev3DevUtils.execCommand("turn_left");
+					Thread.sleep(2000);
 				} else {
 					ui.appendLog("Right");
 					ui.ev3DevUtils.execCommand("turn_right");
+					Thread.sleep(2000);
 				}
 				rand = generator.nextInt(3);
 				if (rand < 1) {
 					ui.appendLog("Walk");
 					ui.ev3DevUtils.execCommand("walk");
+					Thread.sleep(2000);
 				} else if (rand < 2) {
 					ui.appendLog("Run");
 					ui.ev3DevUtils.execCommand("run");
+					Thread.sleep(2000);
 				}
 				// TAKE PICTURE
 				Image image = ui.takePicture();
