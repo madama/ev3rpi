@@ -270,7 +270,7 @@ public class RobotUI extends JFrame {
 		appendLog(message);
 	}
 
-	private void appendLog(String message) {
+	protected void appendLog(String message) {
 		log.append(message);
 		log.append("\n");
 	}

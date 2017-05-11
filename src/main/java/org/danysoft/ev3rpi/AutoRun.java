@@ -31,14 +31,18 @@ public class AutoRun implements Runnable {
 				Random generator = new Random();
 				int rand = generator.nextInt(2);
 				if (rand < 1) {
+					ui.appendLog("Left");
 					ui.ev3DevUtils.execCommand("turn_left");
 				} else {
+					ui.appendLog("Right");
 					ui.ev3DevUtils.execCommand("turn_right");
 				}
 				rand = generator.nextInt(3);
 				if (rand < 1) {
+					ui.appendLog("Walk");
 					ui.ev3DevUtils.execCommand("walk");
 				} else if (rand < 2) {
+					ui.appendLog("Run");
 					ui.ev3DevUtils.execCommand("run");
 				}
 				// TAKE PICTURE
@@ -66,6 +70,7 @@ public class AutoRun implements Runnable {
 				}
 				rand = generator.nextInt(3);
 				if (rand < 1) {
+					ui.appendLog("Shake");
 					ui.ev3DevUtils.execCommand("shake");
 				}
 				Thread.sleep(2000);

@@ -22,7 +22,7 @@ public class SSHUtils {
 			try {
 				ssh.connect(ip);
 			} catch (Exception e) {
-				System.out.println("Retrying SSH connection...");
+				System.out.println("Retrying SSH connection with " + ip + "...");
 				try {
 					Thread.sleep(5000);
 				} catch (InterruptedException e1) {
