@@ -53,8 +53,9 @@ public class AudioUtils {
 
 	public void playAudio(String fileName) {
 		try {
-			//Runtime.getRuntime().exec("aplay -t raw -c 1 -r 16000 -f S16_LE " + fileName);
-			playAudio(new FileInputStream(fileName));
+			Process p = Runtime.getRuntime().exec("aplay -t raw -c 1 -r 16000 -f S16_LE " + fileName);
+			p.waitFor();
+			//playAudio(new FileInputStream(fileName));
 		} catch (Exception e) {
 			e.printStackTrace(System.err);
 		}

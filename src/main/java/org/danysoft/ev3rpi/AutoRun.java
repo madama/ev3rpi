@@ -68,7 +68,7 @@ public class AutoRun implements Runnable {
 						ui.talk(recognized);
 					}
 				}
-				rand = generator.nextInt(3);
+				rand = generator.nextInt(5);
 				if (rand < 1) {
 					ui.appendLog("Shake");
 					ui.ev3DevUtils.execCommand("shake");
