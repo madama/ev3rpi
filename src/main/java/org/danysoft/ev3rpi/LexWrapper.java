@@ -31,7 +31,7 @@ public class LexWrapper {
 		req.setUserId(user);
 		req.setAccept("text/plain; charset=utf-8");
 		PostContentResult res = lex.postContent(req);
-		System.out.println("Lex response: " + res);
+		System.out.println("Lex transcriptedText: " + res.getInputTranscript());
 		return res.getMessage();
 	}
 
@@ -42,7 +42,7 @@ public class LexWrapper {
 		req.setInputText(text);
 		req.setUserId(user);
 		PostTextResult res = lex.postText(req);
-		System.out.println("Lex response: " + res);
+		//System.out.println("Lex response: " + res.getMessage());
 		return res.getMessage();
 	}
 

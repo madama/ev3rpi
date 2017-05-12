@@ -154,18 +154,17 @@ public class RobotUI extends JFrame {
 		// REC
 		rec = new JToggleButton("REC");
 		rec.setText("Rec");
-		rec.setPreferredSize(new Dimension(120, 25));
+		rec.setPreferredSize(new Dimension(70, 25));
 		rec.setMnemonic(KeyEvent.VK_R);
 		rec.addActionListener(new RecActionListener());
 
 		// Auto
 		auto = new JToggleButton("Auto");
 		auto.setText("Auto");
-		auto.setPreferredSize(new Dimension(120, 25));
+		auto.setPreferredSize(new Dimension(70, 25));
 		auto.setMnemonic(KeyEvent.VK_A);
 		auto.addActionListener(new AutoActionListener());
 		autorun = new AutoRun(this);
-		rec = auto;
 
 		// MIC
 		mic = new JComboBox<String>();
@@ -241,6 +240,8 @@ public class RobotUI extends JFrame {
 								.addGroup(layout.createSequentialGroup()
 										.addComponent(rec, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 												GroupLayout.PREFERRED_SIZE)
+										.addComponent(auto, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+												GroupLayout.PREFERRED_SIZE)
 										.addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED).addComponent(mic,
 												GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 												GroupLayout.PREFERRED_SIZE))
@@ -253,6 +254,8 @@ public class RobotUI extends JFrame {
 						.createSequentialGroup()
 						.addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
 								.addComponent(rec, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+										GroupLayout.PREFERRED_SIZE)
+								.addComponent(auto, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 										GroupLayout.PREFERRED_SIZE)
 								.addComponent(mic, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 										GroupLayout.PREFERRED_SIZE))

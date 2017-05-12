@@ -29,25 +29,28 @@ public class AutoRun implements Runnable {
 			try {
 				// RANDOM MOVEMENT
 				Random generator = new Random();
-				int rand = generator.nextInt(2);
-				if (rand < 1) {
-					ui.appendLog("Left");
-					ui.ev3DevUtils.execCommand("turn_left");
-					Thread.sleep(2000);
-				} else {
-					ui.appendLog("Right");
-					ui.ev3DevUtils.execCommand("turn_right");
-					Thread.sleep(2000);
-				}
-				rand = generator.nextInt(3);
-				if (rand < 1) {
-					ui.appendLog("Walk");
-					ui.ev3DevUtils.execCommand("walk");
-					Thread.sleep(2000);
-				} else if (rand < 2) {
-					ui.appendLog("Run");
-					ui.ev3DevUtils.execCommand("run");
-					Thread.sleep(2000);
+				int rand = 0;
+				if (ui.ev3DevUtils != null) {
+					rand = generator.nextInt(2);
+					if (rand < 1) {
+						ui.appendLog("Left");
+						ui.ev3DevUtils.execCommand("turn_left");
+						Thread.sleep(2000);
+					} else {
+						ui.appendLog("Right");
+						ui.ev3DevUtils.execCommand("turn_right");
+						Thread.sleep(2000);
+					}
+					rand = generator.nextInt(3);
+					if (rand < 1) {
+						ui.appendLog("Walk");
+						ui.ev3DevUtils.execCommand("walk");
+						Thread.sleep(2000);
+					} else if (rand < 2) {
+						ui.appendLog("Run");
+						ui.ev3DevUtils.execCommand("run");
+						Thread.sleep(2000);
+					}
 				}
 				// TAKE PICTURE
 				Image image = ui.takePicture();
@@ -72,11 +75,13 @@ public class AutoRun implements Runnable {
 						ui.talk(recognized);
 					}
 				}
-				rand = generator.nextInt(5);
-				if (rand < 1) {
-					ui.appendLog("Shake");
-					ui.ev3DevUtils.execCommand("shake");
-				}
+				/*if (ui.ev3DevUtils != null) {
+					rand = generator.nextInt(5);
+					if (rand < 1) {
+						ui.appendLog("Shake");
+						ui.ev3DevUtils.execCommand("shake");
+					}
+				}*/
 				Thread.sleep(2000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
