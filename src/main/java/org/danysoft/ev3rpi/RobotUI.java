@@ -62,6 +62,8 @@ import com.amazonaws.services.rekognition.model.Label;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.sqs.AmazonSQS;
+import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.util.StringInputStream;
 
 import net.schmizz.sshj.common.IOUtils;
@@ -83,7 +85,7 @@ public class RobotUI extends JFrame {
 	private Properties properties = new Properties();
 
 	private JToggleButton rec;
-	private JToggleButton auto;
+	protected JToggleButton auto;
 	private JComboBox<String> mic;
 	private JTextArea commandLog;
 	private JTextArea log;
@@ -105,6 +107,7 @@ public class RobotUI extends JFrame {
 	protected PollyWrapper polly;
 	protected RekognitionWrapper rekognition;
 	protected S3Wrapper s3;
+	protected SQSWrapper sqs;
 
 	public RobotUI() {
 		init();
@@ -137,6 +140,8 @@ public class RobotUI extends JFrame {
 		rekognition = new RekognitionWrapper(rekognitionClient);
 		AmazonS3 s3Client = AmazonS3Client.builder().withRegion(Regions.EU_WEST_1).withCredentials(awsCredentials).build();
 		s3 = new S3Wrapper(s3Client);
+		AmazonSQS sqsClient = AmazonSQSClient.builder().withRegion(Regions.EU_WEST_1).withCredentials(awsCredentials).build();
+		sqs = new SQSWrapper(sqsClient, "EV3RPIAlexa");
 		collectionFaces = properties.getProperty("rekognition.collection");
 		facesBucket = properties.getProperty("rekognition.faces.bucket");
 		//rekognition.deleteCollection(collectionFaces);
@@ -165,6 +170,7 @@ public class RobotUI extends JFrame {
 		auto.setMnemonic(KeyEvent.VK_A);
 		auto.addActionListener(new AutoActionListener());
 		autorun = new AutoRun(this);
+		new Thread(new SQSReader(this)).start();
 
 		// MIC
 		mic = new JComboBox<String>();
