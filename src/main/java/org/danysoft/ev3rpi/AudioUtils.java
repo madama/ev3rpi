@@ -3,6 +3,7 @@ package org.danysoft.ev3rpi;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.StandardCopyOption;
@@ -10,12 +11,12 @@ import java.nio.file.StandardCopyOption;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.Line;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.SourceDataLine;
 import javax.sound.sampled.TargetDataLine;
+
 
 public class AudioUtils {
 
@@ -52,23 +53,33 @@ public class AudioUtils {
 
 	public void playAudio(String fileName) {
 		try {
-			Runtime.getRuntime().exec("aplay -t raw -c 1 -r 16000 -f S16_LE " + fileName);
+			Process p = Runtime.getRuntime().exec("aplay -t raw -c 1 -r 16000 -f S16_LE " + fileName);
+			p.waitFor();
+			//playAudio(new FileInputStream(fileName));
 		} catch (Exception e) {
 			e.printStackTrace(System.err);
 		}
 	}
 
-	public void playAudio(AudioInputStream audio) {
+	public void playAudio(InputStream is) {
 		try {
-			System.out.println("Start audio playing...");
-			Clip player = AudioSystem.getClip();
-			player.open(audio);
-			player.start();
-			while (!player.isRunning()) {
-				Thread.sleep(10);
+			AudioFormat af = getAudioFormat();
+			DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
+			SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info);
+			line.open(af);
+			line.start();
+			int nBytesRead = 0;
+			byte[] abData = new byte[128000];
+			while (nBytesRead != -1) {
+				try {
+					nBytesRead = is.read(abData, 0, abData.length);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				if (nBytesRead >= 0) {
+					line.write(abData, 0, nBytesRead);
+				}
 			}
-			player.close();
-			System.out.println("Audio played!");
 		} catch (Exception e) {
 			System.err.println("Cannot play audio file! " + e.getMessage());
 		}

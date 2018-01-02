@@ -83,6 +83,7 @@ public class RobotUI extends JFrame {
 	private Properties properties = new Properties();
 
 	private JToggleButton rec;
+	private JToggleButton auto;
 	private JComboBox<String> mic;
 	private JTextArea commandLog;
 	private JTextArea log;
@@ -91,19 +92,19 @@ public class RobotUI extends JFrame {
 	private OpenCVUtils cvUtils;
 	private CamUtils camUtils;
 	private AudioUtils audioUtils;
-	private EV3DevUtils ev3DevUtils;
+	protected EV3DevUtils ev3DevUtils;
 
 	private AudioRecorder recorder;
-	private AudioInputStream audioIS;
 	private Mixer mixer;
 	private Map<String, String> mixers = new HashMap<String, String>();
 	private String collectionFaces;
 	private String facesBucket;
+	private AutoRun autorun;
 
-	private LexWrapper lex;
-	private PollyWrapper polly;
-	private RekognitionWrapper rekognition;
-	private S3Wrapper s3;
+	protected LexWrapper lex;
+	protected PollyWrapper polly;
+	protected RekognitionWrapper rekognition;
+	protected S3Wrapper s3;
 
 	public RobotUI() {
 		init();
@@ -138,8 +139,8 @@ public class RobotUI extends JFrame {
 		s3 = new S3Wrapper(s3Client);
 		collectionFaces = properties.getProperty("rekognition.collection");
 		facesBucket = properties.getProperty("rekognition.faces.bucket");
-		rekognition.deleteCollection(collectionFaces);
-		rekognition.createCollection(collectionFaces);
+		//rekognition.deleteCollection(collectionFaces);
+		//rekognition.createCollection(collectionFaces);
 	}
 
 	private void draw() {
@@ -153,9 +154,17 @@ public class RobotUI extends JFrame {
 		// REC
 		rec = new JToggleButton("REC");
 		rec.setText("Rec");
-		rec.setPreferredSize(new Dimension(120, 25));
+		rec.setPreferredSize(new Dimension(70, 25));
 		rec.setMnemonic(KeyEvent.VK_R);
 		rec.addActionListener(new RecActionListener());
+
+		// Auto
+		auto = new JToggleButton("Auto");
+		auto.setText("Auto");
+		auto.setPreferredSize(new Dimension(70, 25));
+		auto.setMnemonic(KeyEvent.VK_A);
+		auto.addActionListener(new AutoActionListener());
+		autorun = new AutoRun(this);
 
 		// MIC
 		mic = new JComboBox<String>();
@@ -193,6 +202,7 @@ public class RobotUI extends JFrame {
 		log = new JTextArea();
 		log.setColumns(20);
 		log.setRows(5);
+		log.setLineWrap(true);
 
 		scpLog.setViewportView(log);
 		GroupLayout logPanelLayout = new GroupLayout(logPanel);
@@ -230,6 +240,8 @@ public class RobotUI extends JFrame {
 								.addGroup(layout.createSequentialGroup()
 										.addComponent(rec, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 												GroupLayout.PREFERRED_SIZE)
+										.addComponent(auto, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+												GroupLayout.PREFERRED_SIZE)
 										.addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED).addComponent(mic,
 												GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 												GroupLayout.PREFERRED_SIZE))
@@ -242,6 +254,8 @@ public class RobotUI extends JFrame {
 						.createSequentialGroup()
 						.addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
 								.addComponent(rec, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
+										GroupLayout.PREFERRED_SIZE)
+								.addComponent(auto, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 										GroupLayout.PREFERRED_SIZE)
 								.addComponent(mic, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE,
 										GroupLayout.PREFERRED_SIZE))
@@ -259,7 +273,7 @@ public class RobotUI extends JFrame {
 		appendLog(message);
 	}
 
-	private void appendLog(String message) {
+	protected void appendLog(String message) {
 		log.append(message);
 		log.append("\n");
 	}
@@ -283,20 +297,9 @@ public class RobotUI extends JFrame {
 		@Override
 		public void actionPerformed(ActionEvent event) {
 			if (recorder == null) {
-				appendLog("Start Audio Recording...");
-				recorder = audioUtils.startRecording(mixer);
+				startAudioRecording();
 			} else {
-				recorder.stop();
-				while (!recorder.isDone()) {
-					try {
-						Thread.sleep(10);
-					} catch (InterruptedException err) {
-						appendLog("ERROR: " + err.getMessage());
-					}
-				}
-				audioIS = recorder.getAudioInputStream();
-				appendLog("Audio Recording Complete! " + recorder.getDuration());
-				recorder = null;
+				AudioInputStream audioIS = stopAudioRecording();
 				audioUtils.saveAudio("fromMic.wav", audioIS);
 				appendLog("Send audio to Lex");
 				String lexOutput = lex.sendAudio(audioIS);
@@ -306,99 +309,20 @@ public class RobotUI extends JFrame {
 					String command = lexOutput.substring(20).trim();
 					if (command.contains("label")) {
 						Image image = takePicture();
-						List<Label> labels = rekognition.detectLabels(image);
-						StringBuffer labelsText = new StringBuffer("In this photo I can recognize: ");
-						for (Label l : labels) {
-							if (l.getConfidence().intValue() > threshold) {
-								labelsText.append(l.getName()).append(", ");
-							}
-						}
-						talk(labelsText.toString());
+						recognizeLabels(image, threshold);
 					} else if (command.contains("face")) {
 						Image image = takePicture();
-						List<FaceDetail> faces = rekognition.detectFaces(image);
-						StringBuffer facesText = new StringBuffer("In this face I can recognize: ");
-						for (FaceDetail f : faces) {
-							facesText.append("face! ");
-							if (f.getBeard().getConfidence().intValue() > threshold && f.getBeard().isValue()) {
-								facesText.append("beard, ");
-							}
-							List<Emotion> emotions = f.getEmotions();
-							for (Emotion e : emotions) {
-								if (e.getConfidence().intValue() > threshold) {
-									facesText.append(e.getType()).append(", ");
-								}
-							}
-							if (f.getEyeglasses().getConfidence().intValue() > threshold && f.getEyeglasses().isValue()) {
-								facesText.append("eyeglasses, ");
-							}
-							if (f.getEyesOpen().getConfidence().intValue() > threshold && f.getEyesOpen().isValue()) {
-								facesText.append("eyes open, ");
-							}
-							if (f.getGender().getConfidence().intValue() > threshold) {
-								facesText.append(f.getGender().getValue()).append(", ");
-							}
-							if (f.getMouthOpen().getConfidence().intValue() > threshold && f.getMouthOpen().isValue()) {
-								facesText.append("mouth open, ");
-							}
-							if (f.getMustache().getConfidence().intValue() > threshold && f.getMustache().isValue()) {
-								facesText.append("mustache, ");
-							}
-							if (f.getSmile().getConfidence().intValue() > threshold && f.getSmile().isValue()) {
-								facesText.append("smile, ");
-							}
-							if (f.getSunglasses().getConfidence().intValue() > threshold && f.getSunglasses().isValue()) {
-								facesText.append("sunglasses, ");
-							}
-						}
-						talk(facesText.toString());
+						recognizeFaces(image, threshold);
 					} else if (command.equals("SearchFacesByImage")) {
 						Image image = takePicture();
-						List<FaceMatch> matches = rekognition.searchFacesByImage(collectionFaces, image);
-						//System.out.println(matches);
-						Map<String, Integer> occurrencies = new HashMap<String, Integer>();
-						for (FaceMatch fm : matches) {
-							String fId = getFaceID(fm.getFace());
-							if (s3.exist(facesBucket, fId)) {
-								String faceName = null;
-								S3Object s3Obj = s3.get(facesBucket, fId);
-								try {
-									faceName = IOUtils.readFully(s3Obj.getObjectContent()).toString();
-								} catch (IOException e) {
-									e.printStackTrace(System.err);
-								}
-								//System.out.println(faceName);
-								Integer occ = occurrencies.get(faceName);
-								if (occ == null) {
-									occurrencies.put(faceName, 1);
-								} else {
-									occurrencies.put(faceName, occ.intValue() + 1);
-								}
-							}
-						}
-						//System.out.println(occurrencies);
-						String faceId = "";
-						String faceName = "";
-						List<FaceRecord> faceRecords = rekognition.indexFaces(collectionFaces, image);
-						//System.out.println(faceRecords);
-						for (FaceRecord f : faceRecords) {
-							faceId = getFaceID(f.getFace());
-							break; //TODO: Handle more faces
-						}
-						if (!occurrencies.isEmpty()) {
-							int occ = 0;
-							for (String key : occurrencies.keySet()) {
-								if (occurrencies.get(key).intValue() > occ) {
-									faceName = key;
-								}
-							}
-							String recognized = "Hi " + faceName + "!";
+						Map<String, String> face = recognizeFace(image);
+						if (face.containsKey("faceName")) {
+							String recognized = "Hi " + face.get("faceName") + "!";
 							talk(recognized);
-							saveFaceName(faceId, faceName);
 						} else {
 							String out = lex.sendText("COMMAND Ask Name");
 							if (out.equals("Your Face ID?")) {
-								out = lex.sendText(faceId);
+								out = lex.sendText(face.get("faceId"));
 								if (out.equals("What's your name?")) {
 									talk(out);
 								}
@@ -421,7 +345,126 @@ public class RobotUI extends JFrame {
 		}
 	}
 
-	private InputStream talk(String text) {
+	private Thread autoRunThread;
+	private class AutoActionListener implements ActionListener {
+		@Override
+		public void actionPerformed(ActionEvent event) {
+			if (!autorun.isRunning()) {
+				autoRunThread = new Thread(autorun);
+				autoRunThread.start();
+			} else {
+				auto.setSelected(false);
+				autorun.stop();
+				try {
+					autoRunThread.join();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	protected List<Label> recognizeLabels(Image image, int threshold) {
+		List<Label> labels = rekognition.detectLabels(image);
+		StringBuffer labelsText = new StringBuffer("In this image I can recognize: ");
+		for (Label l : labels) {
+			if (l.getConfidence().intValue() > threshold) {
+				labelsText.append(l.getName()).append(", ");
+			}
+		}
+		talk(labelsText.toString());
+		return labels;
+	}
+
+	protected List<FaceDetail> recognizeFaces(Image image, int threshold) {
+		List<FaceDetail> faces = rekognition.detectFaces(image);
+		StringBuffer facesText = new StringBuffer("In this photo I can recognize ");
+		for (FaceDetail f : faces) {
+			facesText.append(" a face with: ");
+			if (f.getBeard().getConfidence().intValue() > threshold && f.getBeard().isValue()) {
+				facesText.append("beard, ");
+			}
+			if (f.getEyeglasses().getConfidence().intValue() > threshold && f.getEyeglasses().isValue()) {
+				facesText.append("eyeglasses, ");
+			}
+			if (f.getEyesOpen().getConfidence().intValue() > threshold && f.getEyesOpen().isValue()) {
+				facesText.append("eyes open, ");
+			}
+			if (f.getGender().getConfidence().intValue() > threshold) {
+				facesText.append(f.getGender().getValue()).append(", ");
+			}
+			if (f.getMouthOpen().getConfidence().intValue() > threshold && f.getMouthOpen().isValue()) {
+				facesText.append("mouth open, ");
+			}
+			if (f.getMustache().getConfidence().intValue() > threshold && f.getMustache().isValue()) {
+				facesText.append("mustache, ");
+			}
+			if (f.getSmile().getConfidence().intValue() > threshold && f.getSmile().isValue()) {
+				facesText.append("smile, ");
+			}
+			if (f.getSunglasses().getConfidence().intValue() > threshold && f.getSunglasses().isValue()) {
+				facesText.append("sunglasses, ");
+			}
+			List<Emotion> emotions = f.getEmotions();
+			for (Emotion e : emotions) {
+				if (e.getConfidence().intValue() > threshold) {
+					facesText.append(e.getType()).append(", ");
+				}
+			}
+			facesText.append(". ");
+		}
+		if (faces.size() > 0) {
+			talk(facesText.toString());
+		}
+		return faces;
+	}
+
+	protected Map<String, String> recognizeFace(Image image) {
+		List<FaceMatch> matches = rekognition.searchFacesByImage(collectionFaces, image);
+		Map<String, Integer> occurrencies = new HashMap<String, Integer>();
+		for (FaceMatch fm : matches) {
+			String fId = getFaceID(fm.getFace());
+			if (s3.exist(facesBucket, fId)) {
+				String faceName = null;
+				S3Object s3Obj = s3.get(facesBucket, fId);
+				try {
+					faceName = IOUtils.readFully(s3Obj.getObjectContent()).toString();
+				} catch (IOException e) {
+					e.printStackTrace(System.err);
+				}
+				Integer occ = occurrencies.get(faceName);
+				if (occ == null) {
+					occurrencies.put(faceName, 1);
+				} else {
+					occurrencies.put(faceName, occ.intValue() + 1);
+				}
+			}
+		}
+		String faceId = "";
+		String faceName = "";
+		List<FaceRecord> faceRecords = rekognition.indexFaces(collectionFaces, image);
+		for (FaceRecord f : faceRecords) {
+			faceId = getFaceID(f.getFace());
+			break; //TODO: Handle more faces
+		}
+		if (!occurrencies.isEmpty()) {
+			int occ = 0;
+			for (String key : occurrencies.keySet()) {
+				if (occurrencies.get(key).intValue() > occ) {
+					faceName = key;
+				}
+			}
+			saveFaceName(faceId, faceName);
+		}
+		Map<String, String> result = new HashMap<String, String>();
+		result.put("faceId", faceId);
+		if (faceName.length() > 0) {
+			result.put("faceName", faceName);
+		}
+		return result;
+	}
+
+	protected InputStream talk(String text) {
 		return talk(text, true);
 	}
 
@@ -435,7 +478,7 @@ public class RobotUI extends JFrame {
 		return tts;
 	}
 
-	private Image takePicture() {
+	protected Image takePicture() {
 		String fileName = "capture.png";
 		camUtils.capture(fileName);
 		Image image = new Image();
@@ -449,7 +492,7 @@ public class RobotUI extends JFrame {
 		return image;
 	}
 
-	private void saveFaceName(String faceId, String faceName) {
+	protected void saveFaceName(String faceId, String faceName) {
 		try {
 			s3.put(new StringInputStream(faceName), facesBucket, faceId);
 		} catch (UnsupportedEncodingException e) {
@@ -459,7 +502,27 @@ public class RobotUI extends JFrame {
 
 	private String getFaceID(Face face) {
 		return face.getFaceId().replaceAll("-", "_");
-		//return face.getFaceId().substring(0, 8);
+	}
+
+	protected AudioRecorder startAudioRecording() {
+		appendLog("Start Audio Recording...");
+		recorder = audioUtils.startRecording(mixer);
+		return recorder;
+	}
+
+	protected AudioInputStream stopAudioRecording() {
+		recorder.stop();
+		while (!recorder.isDone()) {
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException err) {
+				appendLog("ERROR: " + err.getMessage());
+			}
+		}
+		AudioInputStream audioIS = recorder.getAudioInputStream();
+		appendLog("Audio Recording Complete! " + recorder.getDuration());
+		recorder = null;
+		return audioIS;
 	}
 
 }
